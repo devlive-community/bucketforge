@@ -119,10 +119,18 @@ function openPdfWindow(account: string, entry: Entry) {
   win.once("tauri://error", (e) => console.error("open pdf window failed", e));
 }
 
+/** 固定桶账号的有效根；普通账号的有效根仍是全部桶列表。 */
+function accountRootPath(bucket?: string): string {
+  const name = bucket?.trim();
+  return name ? `${name}/` : "";
+}
+
 export default function App() {
   const { t } = useI18n();
   const [accounts, setAccounts] = useState<AccountInfo[]>([]);
   const [current, setCurrent] = useState<string | null>(null);
+  const currentAccount = accounts.find((account) => account.id === current);
+  const accountRoot = accountRootPath(currentAccount?.pinned_bucket);
   // 界面偏好(侧栏宽 / 视图 / 主题)持久化在 SQLite(ui_prefs 表)。先用默认值渲染,
   // 挂载后从后端加载并回填;prefsHydrated 为真前不回写,避免用默认值覆盖已存的偏好。
   const prefsHydrated = useRef(false);
@@ -723,11 +731,25 @@ export default function App() {
     const list = await api.listAccountInfos();
     setAccounts(list);
     setCurrent((cur) => cur ?? list[0]?.id ?? null);
+    return list;
   }, []);
 
   useEffect(() => {
     refreshAccounts();
   }, [refreshAccounts]);
+
+  // 固定桶账号没有可发现的“全部桶”界面；首次选择账号时直接落在桶根。
+  useEffect(() => {
+    if (current || accounts.length === 0) return;
+    const first = accounts[0];
+    setCurrent(first.id);
+    setPath(accountRootPath(first.pinned_bucket));
+  }, [accounts, current]);
+
+  // 手工输入根路径或历史记录残留 "" 时，仍然立即回到固定桶根。
+  useEffect(() => {
+    if (current && accountRoot && path === "") setPath(accountRoot);
+  }, [accountRoot, current, path]);
 
   useEffect(() => {
     if (prefsHydrated.current)
@@ -992,7 +1014,11 @@ export default function App() {
 
   const selectAccount = (id: string) => {
     setCurrent(id);
-    setPath("");
+    setPath(
+      accountRootPath(
+        accounts.find((account) => account.id === id)?.pinned_bucket,
+      ),
+    );
   };
 
   const addAccount = async (
@@ -1016,6 +1042,7 @@ export default function App() {
     sk: string,
     endpoint: string,
     customDomain: string,
+    pinnedBucket: string,
   ) => {
     setShowForm(false);
     const oldId = editInfo?.id;
@@ -1046,9 +1073,15 @@ export default function App() {
         await adders[vendor](id, ak, sk, endpoint);
       }
       await api.setAccountDomain(id, customDomain.trim());
-      await refreshAccounts();
+      await api.setAccountPinnedBucket(id, pinnedBucket.trim());
+      const refreshed = await refreshAccounts();
       setCurrent(id);
-      setPath("");
+      setPath(
+        accountRootPath(
+          refreshed.find((account) => account.id === id)?.pinned_bucket ??
+            pinnedBucket,
+        ),
+      );
     } catch (e) {
       setError(String(e));
     }
@@ -1064,14 +1097,18 @@ export default function App() {
   };
 
   const removeAccount = async (id: string) => {
+    const wasCurrent = current === id;
     await api.removeAccount(id);
-    if (current === id) {
-      setCurrent(null);
-      setPath("");
-      setEntries([]);
-    }
-    await refreshAccounts();
+    const nextAccounts = await refreshAccounts();
+    if (!wasCurrent) return;
+    const next = nextAccounts.find((account) => account.id !== id);
+    setCurrent(next?.id ?? null);
+    setPath(accountRootPath(next?.pinned_bucket));
+    setEntries([]);
   };
+
+  const navigate = (nextPath: string) =>
+    setPath(accountRoot && nextPath === "" ? accountRoot : nextPath);
 
   const doBatchDelete = async () => {
     setPendingBatchDelete(false);
@@ -2003,7 +2040,7 @@ export default function App() {
     } else if (matchBinding(e, keys.deleteSelected) && selected.size > 0) {
       e.preventDefault();
       setPendingBatchDelete(true);
-    } else if (matchBinding(e, keys.parent) && path !== "") {
+    } else if (matchBinding(e, keys.parent) && path !== accountRoot) {
       e.preventDefault();
       setPath(parentPath(path));
     } else if (matchBinding(e, keys.refresh)) {
@@ -2025,7 +2062,7 @@ export default function App() {
   const paletteCommands: PaletteCommand[] = [];
   if (current)
     paletteCommands.push({ id: "refresh", label: t("刷新"), run: () => void load() });
-  if (path !== "") {
+  if (path !== accountRoot) {
     paletteCommands.push({
       id: "up",
       label: t("上一层"),
@@ -2136,7 +2173,7 @@ export default function App() {
         {current ? (
           <>
             <div className="main__header">
-              <Breadcrumb path={path} onNavigate={setPath} />
+              <Breadcrumb path={path} onNavigate={navigate} />
               <Bookmarks
                 bookmarks={bookmarks}
                 isBookmarked={isBookmarked}
@@ -2150,7 +2187,7 @@ export default function App() {
                 canForward={canForward}
                 onBack={() => goHistory(-1)}
                 onForward={() => goHistory(1)}
-                canGoUp={path !== ""}
+                canGoUp={path !== accountRoot}
                 canUpload={path !== ""}
                 busy={busy}
                 filter={filter}
@@ -2334,6 +2371,7 @@ export default function App() {
                   accessKeyId: editInfo.access_key_id,
                   endpoint: editInfo.endpoint,
                   customDomain: editInfo.custom_domain,
+                  pinnedBucket: editInfo.pinned_bucket,
                 }
               : undefined
           }

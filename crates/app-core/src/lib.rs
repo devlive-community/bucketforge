@@ -21,6 +21,7 @@ mod limits;
 mod manifest;
 mod matting_plugin;
 mod pdf;
+mod pinned;
 mod preview;
 mod secret;
 mod settings;
@@ -61,6 +62,7 @@ pub use nebula_provider::{
     ByteStream, Capabilities, CorsRule, EntryKind, Grant, IncompleteUpload, LifecycleRule,
     ObjectVersion, Page, Permission, ProgressFn, WebsiteConfig,
 };
+use pinned::PinnedBucketProvider;
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
@@ -139,6 +141,8 @@ pub struct AccountInfo {
     pub endpoint: String,
     /// 自定义公共域名(CDN / CNAME);空表示未配置。
     pub custom_domain: String,
+    /// 可选固定 bucket;空表示按普通多桶账号发现。
+    pub pinned_bucket: String,
 }
 
 /// 传输面板任务的持久化记录,用于跨重启恢复列表。字段与前端 TransferItem 对应;
@@ -317,92 +321,148 @@ impl App {
     /// 按厂商把一条记录 + 密钥注册为 provider(未知厂商忽略)。
     fn register_record(&self, rec: &AccountRecord, secret: &str) {
         match rec.vendor.as_str() {
-            VENDOR_ALIYUN => self.registry.register(Arc::new(AliyunProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_HUAWEI => self.registry.register(Arc::new(HuaweiProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_QINIU => self.registry.register(Arc::new(QiniuProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_AWS => self.registry.register(Arc::new(AwsProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_R2 => self.registry.register(Arc::new(R2Provider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_MINIO => self.registry.register(Arc::new(MinioProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_TENCENT => self.registry.register(Arc::new(TencentProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_B2 => self.registry.register(Arc::new(B2Provider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_WASABI => self.registry.register(Arc::new(WasabiProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_DO_SPACES => self.registry.register(Arc::new(DoSpacesProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_SCALEWAY => self.registry.register(Arc::new(ScalewayProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_US3 => self.registry.register(Arc::new(Us3Provider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_JDCLOUD => self.registry.register(Arc::new(JdCloudProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
-            VENDOR_UPYUN => self.registry.register(Arc::new(UpyunProvider::new(
-                rec.id.clone(),
-                rec.access_key_id.clone(),
-                secret.to_string(),
-                rec.endpoint.clone(),
-            ))),
+            VENDOR_ALIYUN => self.register_pinned(
+                rec,
+                Arc::new(AliyunProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_HUAWEI => self.register_pinned(
+                rec,
+                Arc::new(HuaweiProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_QINIU => self.register_pinned(
+                rec,
+                Arc::new(QiniuProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_AWS => self.register_pinned(
+                rec,
+                Arc::new(AwsProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_R2 => self.register_pinned(
+                rec,
+                Arc::new(R2Provider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_MINIO => self.register_pinned(
+                rec,
+                Arc::new(MinioProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_TENCENT => self.register_pinned(
+                rec,
+                Arc::new(TencentProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_B2 => self.register_pinned(
+                rec,
+                Arc::new(B2Provider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_WASABI => self.register_pinned(
+                rec,
+                Arc::new(WasabiProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_DO_SPACES => self.register_pinned(
+                rec,
+                Arc::new(DoSpacesProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_SCALEWAY => self.register_pinned(
+                rec,
+                Arc::new(ScalewayProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_US3 => self.register_pinned(
+                rec,
+                Arc::new(Us3Provider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_JDCLOUD => self.register_pinned(
+                rec,
+                Arc::new(JdCloudProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
+            VENDOR_UPYUN => self.register_pinned(
+                rec,
+                Arc::new(UpyunProvider::new(
+                    rec.id.clone(),
+                    rec.access_key_id.clone(),
+                    secret.to_string(),
+                    rec.endpoint.clone(),
+                )),
+            ),
             _ => {}
         }
+    }
+
+    /// Wrap a freshly constructed vendor provider so only root discovery changes when a
+    /// credential is intentionally scoped to one bucket. Empty keeps the provider untouched.
+    fn register_pinned(&self, rec: &AccountRecord, provider: Arc<dyn StorageProvider>) {
+        let provider: Arc<dyn StorageProvider> = if rec.pinned_bucket.is_empty() {
+            provider
+        } else {
+            Arc::new(PinnedBucketProvider::new(
+                provider,
+                rec.pinned_bucket.clone(),
+            ))
+        };
+        self.registry.register(provider);
     }
 
     /// 注册一个账号 / provider(以 `provider.id()` 为键)。不持久化。
@@ -430,6 +490,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -458,6 +519,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -485,6 +547,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -512,6 +575,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -539,6 +603,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -566,6 +631,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -594,6 +660,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -621,6 +688,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -648,6 +716,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -675,6 +744,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -702,6 +772,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -729,6 +800,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -756,6 +828,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -783,6 +856,7 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -862,6 +936,7 @@ impl App {
                 access_key_id: r.access_key_id,
                 endpoint: r.endpoint,
                 custom_domain: r.custom_domain,
+                pinned_bucket: r.pinned_bucket,
             })
     }
 
@@ -869,6 +944,40 @@ impl App {
     pub fn set_account_domain(&self, account: &str, domain: &str) -> Result<()> {
         if let Some(store) = &self.store {
             store.set_custom_domain(account, domain.trim())?;
+        }
+        Ok(())
+    }
+
+    /// 设置账号的固定 bucket;空串恢复普通账号。修改后立即重建已注册 provider。
+    pub fn set_account_pinned_bucket(&self, account: &str, bucket: &str) -> Result<()> {
+        let bucket = bucket.trim();
+        if bucket.contains('/') {
+            return Err(AppError::InvalidInput(format!(
+                "固定 bucket 不能包含路径分隔符: {bucket}"
+            )));
+        }
+        let Some(store) = &self.store else {
+            return Err(AppError::InvalidInput(
+                "当前未启用本地存储,无法设置固定 bucket".into(),
+            ));
+        };
+        let Some(_) = store.get(account)? else {
+            return Err(AppError::NoSuchProvider(account.to_string()));
+        };
+
+        let registered = self.registry.get(account).is_some();
+        let secret = if registered {
+            Some(self.secrets.get(account)?)
+        } else {
+            None
+        };
+        store.set_pinned_bucket(account, bucket)?;
+        if registered {
+            self.registry.remove(account);
+            let Some(rec) = store.get(account)? else {
+                return Err(AppError::NoSuchProvider(account.to_string()));
+            };
+            self.register_record(&rec, &secret.expect("registered accounts have a secret"));
         }
         Ok(())
     }
@@ -2952,6 +3061,33 @@ mod tests {
                 VENDOR_HUAWEI.to_string()
             );
         }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[tokio::test]
+    async fn pinned_account_discovers_bucket_without_list_buckets() {
+        let path = temp_db("pinned");
+        let secrets: Arc<dyn SecretStore> = Arc::new(MemorySecrets::default());
+        let app = App::with_store_and_secrets(&path, secrets).unwrap();
+        app.add_aliyun_account("scoped", "ak", "sk", "oss-cn-hangzhou.aliyuncs.com")
+            .unwrap();
+
+        app.set_account_pinned_bucket("scoped", "only-bucket")
+            .unwrap();
+        assert_eq!(
+            app.account_info("scoped").unwrap().pinned_bucket,
+            "only-bucket"
+        );
+        assert_eq!(
+            app.browse("scoped", "").await.unwrap(),
+            vec![Entry::directory("only-bucket")]
+        );
+        assert!(app
+            .set_account_pinned_bucket("scoped", "bad/bucket")
+            .is_err());
+
+        app.set_account_pinned_bucket("scoped", "").unwrap();
+        assert_eq!(app.account_info("scoped").unwrap().pinned_bucket, "");
         let _ = std::fs::remove_file(&path);
     }
 

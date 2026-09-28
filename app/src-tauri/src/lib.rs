@@ -375,6 +375,18 @@ fn set_account_domain(state: State<'_, App>, id: String, domain: String) -> Resu
         .map_err(|e| e.to_string())
 }
 
+/// 设置某账号的固定 bucket;空串清除。非空时账号根目录只显示该桶。
+#[tauri::command]
+fn set_account_pinned_bucket(
+    state: State<'_, App>,
+    id: String,
+    bucket: String,
+) -> Result<(), String> {
+    state
+        .set_account_pinned_bucket(&id, &bucket)
+        .map_err(|e| e.to_string())
+}
+
 /// 读取账号非敏感信息(编辑回填用)。
 #[tauri::command]
 fn get_account(state: State<'_, App>, id: String) -> Option<AccountInfo> {
@@ -2158,6 +2170,7 @@ pub fn run() {
             list_accounts,
             list_account_infos,
             set_account_domain,
+            set_account_pinned_bucket,
             add_aliyun_account,
             add_huawei_account,
             add_qiniu_account,

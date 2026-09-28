@@ -16,6 +16,8 @@ pub struct AccountRecord {
     pub endpoint: String,
     /// 可选的自定义公共域名(CDN / CNAME);设了就用它拼永久公共直链。空表示未配置。
     pub custom_domain: String,
+    /// 可选固定 bucket;非空时账号根目录只显示它,避免无 ListBuckets 权限的凭证失败。
+    pub pinned_bucket: String,
 }
 
 /// 基于 SQLite 的账号存储。跨命令线程共享,内部用 Mutex 串行化访问。
@@ -35,6 +37,7 @@ impl AccountStore {
                 access_key_secret TEXT NOT NULL,
                 endpoint          TEXT NOT NULL,
                 custom_domain     TEXT NOT NULL DEFAULT ''
+                ,pinned_bucket    TEXT NOT NULL DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
@@ -101,6 +104,11 @@ impl AccountStore {
             "ALTER TABLE accounts ADD COLUMN custom_domain TEXT NOT NULL DEFAULT ''",
             [],
         );
+        // 对已有库补列;固定 bucket 是最小权限账号发现能力的向后兼容扩展。
+        let _ = conn.execute(
+            "ALTER TABLE accounts ADD COLUMN pinned_bucket TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // sync_jobs 的上次结果列(早期没有);已存在则忽略。
         let _ = conn.execute(
             "ALTER TABLE sync_jobs ADD COLUMN last_result TEXT NOT NULL DEFAULT ''",
@@ -115,7 +123,7 @@ impl AccountStore {
     pub fn list(&self) -> rusqlite::Result<Vec<AccountRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain
+            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain, pinned_bucket
              FROM accounts ORDER BY id",
         )?;
         let rows = stmt.query_map([], |r| {
@@ -126,6 +134,7 @@ impl AccountStore {
                 access_key_secret: r.get(3)?,
                 endpoint: r.get(4)?,
                 custom_domain: r.get(5)?,
+                pinned_bucket: r.get(6)?,
             })
         })?;
         rows.collect()
@@ -136,8 +145,8 @@ impl AccountStore {
         let conn = self.conn.lock().unwrap();
         // custom_domain 不在这里覆盖(编辑账号凭证时保留已配置的域名),改用 set_custom_domain。
         conn.execute(
-            "INSERT INTO accounts (id, vendor, access_key_id, access_key_secret, endpoint, custom_domain)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "INSERT INTO accounts (id, vendor, access_key_id, access_key_secret, endpoint, custom_domain, pinned_bucket)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(id) DO UPDATE SET
                 vendor = ?2, access_key_id = ?3, access_key_secret = ?4, endpoint = ?5",
             params![
@@ -147,6 +156,7 @@ impl AccountStore {
                 rec.access_key_secret,
                 rec.endpoint,
                 rec.custom_domain
+                ,rec.pinned_bucket
             ],
         )?;
         Ok(())
@@ -162,11 +172,21 @@ impl AccountStore {
         Ok(())
     }
 
+    /// 单独更新某账号的固定 bucket;空串恢复为普通账号。
+    pub fn set_pinned_bucket(&self, id: &str, bucket: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE accounts SET pinned_bucket = ?2 WHERE id = ?1",
+            params![id, bucket],
+        )?;
+        Ok(())
+    }
+
     /// 按 id 读取一条账号(用于取自定义域名等)。
     pub fn get(&self, id: &str) -> rusqlite::Result<Option<AccountRecord>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain
+            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain, pinned_bucket
              FROM accounts WHERE id = ?1",
             params![id],
             |r| {
@@ -176,7 +196,8 @@ impl AccountStore {
                     access_key_id: r.get(2)?,
                     access_key_secret: r.get(3)?,
                     endpoint: r.get(4)?,
-                    custom_domain: r.get(5)?,
+                custom_domain: r.get(5)?,
+                pinned_bucket: r.get(6)?,
                 })
             },
         )
@@ -589,7 +610,23 @@ mod tests {
             access_key_secret: "sk".into(),
             endpoint: "oss-cn-hangzhou.aliyuncs.com".into(),
             custom_domain: String::new(),
+            pinned_bucket: String::new(),
         }
+    }
+
+    #[test]
+    fn pinned_bucket_roundtrip_and_clearing() {
+        let store = AccountStore::open(":memory:").unwrap();
+        let mut rec = record("scoped");
+        rec.pinned_bucket = "only-bucket".into();
+        store.upsert(&rec).unwrap();
+        assert_eq!(
+            store.get("scoped").unwrap().unwrap().pinned_bucket,
+            "only-bucket"
+        );
+
+        store.set_pinned_bucket("scoped", "").unwrap();
+        assert_eq!(store.get("scoped").unwrap().unwrap().pinned_bucket, "");
     }
 
     #[test]
