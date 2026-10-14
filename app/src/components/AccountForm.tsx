@@ -12,6 +12,7 @@ interface Props {
     accessKeyId: string;
     endpoint: string;
     customDomain?: string;
+    pinnedBucket?: string;
   };
   onSubmit: (
     vendor: Vendor,
@@ -20,6 +21,7 @@ interface Props {
     accessKeySecret: string,
     endpoint: string,
     customDomain: string,
+    pinnedBucket: string,
   ) => void;
   onClose: () => void;
 }
@@ -38,6 +40,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
   );
   const [endpointTouched, setEndpointTouched] = useState(editing);
   const [domain, setDomain] = useState(initial?.customDomain ?? "");
+  const [bucket, setBucket] = useState(initial?.pinnedBucket ?? "");
 
   const meta = VENDORS[vendor];
 
@@ -47,17 +50,21 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
     if (!endpointTouched) setEndpoint(VENDORS[next].endpoint);
   };
 
-  // 纯改别名(其它字段都没变)不强制重新输入密钥——密钥只在真的要更新凭证时才必填,
-  // 不然用户光是想改个名字都要翻出密钥重新输一遍。
-  const onlyIdChanged =
+  // 只有凭证或 endpoint 会参与重建 provider;改名、公共域名和固定桶可以不重输密钥。
+  const credentialsChanged =
     editing &&
-    id !== initial!.id &&
-    ak === initial!.accessKeyId &&
-    endpoint === initial!.endpoint &&
-    domain === (initial!.customDomain ?? "");
+    (ak !== initial!.accessKeyId || endpoint !== initial!.endpoint);
   const valid = editing
-    ? !!id && !!ak && !!endpoint && (!!sk || onlyIdChanged)
-    : !!id && !!ak && !!sk && !!endpoint;
+    ? !!id &&
+      !!ak &&
+      !!endpoint &&
+      (!credentialsChanged || !!sk) &&
+      (!bucket.trim() || !bucket.trim().includes("/"))
+    : !!id &&
+      !!ak &&
+      !!sk &&
+      !!endpoint &&
+      (!bucket.trim() || !bucket.trim().includes("/"));
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -101,8 +108,8 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           </label>
           <label className="field">
             <span>
-              {meta.skLabel}
-              {editing ? (onlyIdChanged ? "(仅改别名可留空)" : "(请重新输入)") : ""}
+            {meta.skLabel}
+              {editing ? (credentialsChanged ? "(请重新输入)" : "(可留空)") : ""}
             </span>
             <input
               type="password"
@@ -129,6 +136,14 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
               placeholder="cdn.example.com — 设为公开读后用它拼永久直链"
             />
           </label>
+          <label className="field">
+            <span>指定 Bucket(可选)</span>
+            <input
+              value={bucket}
+              onChange={(e) => setBucket(e.target.value)}
+              placeholder="仅有单桶权限时填写"
+            />
+          </label>
         </div>
 
         <div className="modal__footer">
@@ -138,7 +153,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           <button
             className="btn btn--primary"
             disabled={!valid}
-            onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain)}
+          onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain, bucket)}
           >
             {editing ? "保存" : "添加"}
           </button>

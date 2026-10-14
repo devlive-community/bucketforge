@@ -116,6 +116,10 @@ export const renameAccount = (id: string, newId: string) =>
 export const setAccountDomain = (id: string, domain: string) =>
   invoke<void>("set_account_domain", { id, domain });
 
+/** 设置固定 bucket;空串恢复普通账号根目录。 */
+export const setAccountPinnedBucket = (id: string, bucket: string) =>
+  invoke<void>("set_account_pinned_bucket", { id, bucket });
+
 export const getAccount = (id: string) =>
   invoke<AccountInfo | null>("get_account", { id });
 

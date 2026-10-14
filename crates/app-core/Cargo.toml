@@ -30,6 +30,7 @@ provider-jdcloud = { path = "../providers/provider-jdcloud" }
 provider-upyun = { path = "../providers/provider-upyun" }
 bytes = { workspace = true }
 futures = { workspace = true }
+async-trait = "0.1"
 # 断点续传上传要按偏移读本地文件分片;rt 提供 spawn_blocking(图片解码放阻塞线程池)。
 tokio = { workspace = true, features = ["fs", "io-util", "rt"] }
 serde = { workspace = true }
@@ -52,4 +53,3 @@ keyring = { version = "3", default-features = false, features = [
 [dev-dependencies]
 # test-util 提供虚拟时钟(start_paused),用于确定性地测限速。
 tokio = { workspace = true, features = ["test-util"] }
-async-trait = "0.1"
