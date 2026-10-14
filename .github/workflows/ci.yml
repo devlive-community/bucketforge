@@ -5,19 +5,79 @@ on:
     branches: [dev, main]
   pull_request:
     branches: [dev, main]
+  workflow_dispatch:
 
 # 同一分支的新推送取消仍在跑的旧任务,节省额度。
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# paths-filter 在 pull_request 事件下需要通过 API 读取变更文件列表。
+permissions:
+  contents: read
+  pull-requests: read
+
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
 
 jobs:
+  # 先探测本次推送 / PR 改了什么,再决定哪些 job 值得跑:
+  # - 只动文档 / README / PLAN 等 → Rust 三件套和前端全部跳过(站点部署由 docs.yml 的 paths 过滤负责);
+  # - 只动前端 → 跳过 rustfmt / clippy / test;
+  # - 只动 Rust → 跳过前端;
+  # - 改动 ci.yml 自身 → 无条件全跑,避免"改了工作流却不生效"。
+  changes:
+    name: detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.rust.outputs.rust == 'true' || steps.self.outputs.workflow == 'true' }}
+      frontend: ${{ steps.frontend.outputs.frontend == 'true' || steps.self.outputs.workflow == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+        # push 事件按 event.before 做 git diff,浅克隆拿不到基线提交
+        with:
+          fetch-depth: 0
+
+      # Rust 侧:crates 工作区 + Tauri 壳里的 Rust 代码 + 根目录 Cargo 清单。
+      # 纯 include 列表,默认的 some 量化(命中任一规则即 true)即可。
+      - name: Detect Rust changes
+        id: rust
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rust:
+              - 'crates/**'
+              - 'app/src-tauri/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+
+      # 前端侧:app/ 下除 src-tauri(Rust 代码归上一条管)之外的一切。
+      # include + exclude 组合必须用 every 量化:文件须在 app/ 下且不在 app/src-tauri/ 下。
+      # 注意 every 模式下不能再往里混其它无关规则,ci.yml 自检单独走一条。
+      - name: Detect frontend changes
+        id: frontend
+        uses: dorny/paths-filter@v3
+        with:
+          predicate-quantifier: 'every'
+          filters: |
+            frontend:
+              - 'app/**'
+              - '!app/src-tauri/**'
+
+      - name: Detect workflow self changes
+        id: self
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            workflow:
+              - '.github/workflows/ci.yml'
+
   fmt:
     name: rustfmt
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +90,8 @@ jobs:
 
   clippy:
     name: clippy
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,6 +106,8 @@ jobs:
 
   test:
     name: test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -62,6 +126,8 @@ jobs:
 
   frontend:
     name: frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
