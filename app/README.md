@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="logo.png" alt="BucketForge" width="120" />
+</div>
+
 # BucketForge 桌面应用
 
 Tauri 2 + React + TypeScript + 自定义 CSS 的多云存储管理界面。

@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="app/logo.png" alt="BucketForge" width="120" />
+</div>
+
 [English](README.md) · **简体中文** · [Русский](README.ru.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 [![GitHub stars](https://img.shields.io/github/stars/devlive-community/bucketforge?style=flat&logo=github)](https://github.com/devlive-community/bucketforge)

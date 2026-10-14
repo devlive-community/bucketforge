@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="app/logo.png" alt="BucketForge" width="120" />
+</div>
+
 [English](README.md) · [简体中文](README.zh-CN.md) · **Русский** · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 # BucketForge
