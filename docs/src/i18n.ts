@@ -31,7 +31,7 @@ const messages = {
         migrate: {title: '跨云迁移', desc: '把对象或整个文件夹从一个账号搬到另一个账号,任意云到任意云;同账号走服务端复制,跨账号自动中转;同账号内还能整目录复制 / 移动 / 重命名到任意目录;多选对象可批量重命名(加前缀 / 后缀 / 查找替换,先预览后执行)。'},
         integrity: {title: '完整性校验', desc: '下载内容算 MD5 与远端 ETag 比对,一键确认文件是否在传输中损坏;逻辑只依赖 ETag,对每家云通用。'},
         share: {title: '一键分享', desc: '为对象生成预签名临时链接,有效期可配置,复制即分享;还能生成预签名上传链接,别人无需密钥凭链接直接 PUT 上传;或把对象设为公开读,拿一个不会过期的永久公共直链(还可给账号配自定义域名 / CDN,直链走你自己的域名)。'},
-        secure: {title: '安全省心', desc: '密钥存入系统钥匙串,元信息、设置与传输列表存本地 SQLite(重启后未完成的传输可续),中英双语、明暗主题、快捷键、右键菜单俱全。'},
+        secure: {title: '安全省心', desc: '密钥存入系统钥匙串,元信息、设置与传输列表存本地 SQLite(重启后未完成的传输可续);账号可预设 bucket 点开直达,单桶授权的 AK 也能用;中英双语、明暗主题、快捷键、右键菜单俱全。'},
         update: {title: '自动更新', desc: '应用内检测新版本,一键下载安装并校验更新签名,始终用上最新特性。'}
       }
     },
@@ -85,7 +85,7 @@ const messages = {
         migrate: {title: 'Cross-cloud migration', desc: 'Move objects or entire folders from one account to another, any cloud to any cloud; same-account uses server-side copy, cross-account relays automatically, and a whole folder can be copied / moved / renamed to any directory within an account; selected objects can be batch-renamed (add prefix / suffix / find & replace, previewed before applying).'},
         integrity: {title: 'Integrity check', desc: 'Hash the downloaded bytes and compare against the remote ETag to confirm a file survived transfer intact; keyed only on ETag, so it works for every cloud.'},
         share: {title: 'One-click share', desc: 'Generate presigned temporary links with a configurable expiry — copy and share; also generate presigned upload links so others can PUT a file with no credentials; or make an object public and copy a permanent, non-expiring direct link — optionally through a custom domain / CDN configured per account.'},
-        secure: {title: 'Secure by design', desc: 'Secrets in the system keyring; metadata, settings and the transfer list in local SQLite (unfinished transfers resume after a restart); English / Chinese UI, theming, shortcuts and context menus included.'},
+        secure: {title: 'Secure by design', desc: 'Secrets in the system keyring; metadata, settings and the transfer list in local SQLite (unfinished transfers resume after a restart); preset a bucket per account to open straight into it, even with a key scoped to one bucket; English / Chinese UI, theming, shortcuts and context menus included.'},
         update: {title: 'Auto-update', desc: 'Detect new versions in-app and install with one click, verified by update signatures — always on the latest.'}
       }
     },
