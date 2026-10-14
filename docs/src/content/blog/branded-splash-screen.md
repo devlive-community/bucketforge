@@ -15,7 +15,7 @@ BucketForge 打开的一瞬间,窗口曾经是**纯白**的一小段时间——
 ```html
 <body>
   <div id="splash">
-    <img src="/logo.svg" alt="BucketForge" width="88" height="88" />
+    <img src="/logo.png" alt="BucketForge" width="88" height="88" />
     <div id="splash-name">BucketForge</div>
     <div id="splash-bar"><span></span></div>
   </div>

@@ -2,7 +2,7 @@
   <header class="sticky top-0 z-40 border-b border-slate-200/70 dark:border-white/10 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl">
     <nav class="max-w-6xl mx-auto px-5 h-16 flex items-center gap-8">
       <RouterLink to="/" class="flex items-center gap-2.5 font-semibold text-slate-900 dark:text-white tracking-tight">
-        <img src="/logo.svg" alt="BucketForge" class="w-7 h-7"/>
+        <img src="/logo.png" alt="BucketForge" class="w-7 h-7"/>
         <span>BucketForge</span>
       </RouterLink>
 

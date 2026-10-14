@@ -43,7 +43,7 @@ Endpoint(如 `oss-cn-hangzhou.aliyuncs.com`),即可开始管理。
 打包前用一张 1024×1024 的 PNG 生成完整图标集(含 macOS `.icns` / Windows `.ico`):
 
 ```bash
-pnpm tauri icon ./path/to/app-icon.png
+pnpm tauri icon ./logo.png
 pnpm tauri build
 ```
 

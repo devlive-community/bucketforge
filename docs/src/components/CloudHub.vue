@@ -10,7 +10,7 @@
     <!-- 中心:BucketForge -->
     <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
       <div class="grid place-items-center h-20 w-20 rounded-2xl bg-white/5 ring-1 ring-white/15 backdrop-blur shadow-glow">
-        <img src="/logo.svg" alt="BucketForge" class="h-12 w-12"/>
+        <img src="/logo.png" alt="BucketForge" class="h-12 w-12"/>
       </div>
       <span class="text-sm font-semibold text-white">BucketForge</span>
     </div>
