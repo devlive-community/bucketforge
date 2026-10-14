@@ -722,7 +722,12 @@ export default function App() {
   const refreshAccounts = useCallback(async () => {
     const list = await api.listAccountInfos();
     setAccounts(list);
-    setCurrent((cur) => cur ?? list[0]?.id ?? null);
+    // 首次进入(尚未选账号)时默认打开第一个账号;配了预设 bucket 就直达该桶。
+    setCurrent((cur) => {
+      if (cur) return cur;
+      if (list[0]?.default_bucket) setPath(list[0].default_bucket);
+      return list[0]?.id ?? null;
+    });
   }, []);
 
   useEffect(() => {
@@ -990,9 +995,13 @@ export default function App() {
     return () => unlisten?.();
   }, []);
 
+  // 账号的「首页」:配了预设 bucket 就直达该桶,否则是账号根目录(全部 bucket)。
+  const accountHome = (id: string) =>
+    accounts.find((a) => a.id === id)?.default_bucket ?? "";
+
   const selectAccount = (id: string) => {
     setCurrent(id);
-    setPath("");
+    setPath(accountHome(id));
   };
 
   const addAccount = async (
@@ -1016,6 +1025,7 @@ export default function App() {
     sk: string,
     endpoint: string,
     customDomain: string,
+    defaultBucket: string,
   ) => {
     setShowForm(false);
     const oldId = editInfo?.id;
@@ -1046,9 +1056,11 @@ export default function App() {
         await adders[vendor](id, ak, sk, endpoint);
       }
       await api.setAccountDomain(id, customDomain.trim());
+      const bucket = defaultBucket.trim().replace(/^\/+|\/+$/g, "");
+      await api.setAccountDefaultBucket(id, bucket);
       await refreshAccounts();
       setCurrent(id);
-      setPath("");
+      setPath(bucket);
     } catch (e) {
       setError(String(e));
     }
@@ -2334,6 +2346,7 @@ export default function App() {
                   accessKeyId: editInfo.access_key_id,
                   endpoint: editInfo.endpoint,
                   customDomain: editInfo.custom_domain,
+                  defaultBucket: editInfo.default_bucket,
                 }
               : undefined
           }

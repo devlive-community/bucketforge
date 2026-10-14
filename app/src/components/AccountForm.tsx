@@ -12,6 +12,7 @@ interface Props {
     accessKeyId: string;
     endpoint: string;
     customDomain?: string;
+    defaultBucket?: string;
   };
   onSubmit: (
     vendor: Vendor,
@@ -20,6 +21,7 @@ interface Props {
     accessKeySecret: string,
     endpoint: string,
     customDomain: string,
+    defaultBucket: string,
   ) => void;
   onClose: () => void;
 }
@@ -38,6 +40,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
   );
   const [endpointTouched, setEndpointTouched] = useState(editing);
   const [domain, setDomain] = useState(initial?.customDomain ?? "");
+  const [bucket, setBucket] = useState(initial?.defaultBucket ?? "");
 
   const meta = VENDORS[vendor];
 
@@ -47,16 +50,12 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
     if (!endpointTouched) setEndpoint(VENDORS[next].endpoint);
   };
 
-  // 纯改别名(其它字段都没变)不强制重新输入密钥——密钥只在真的要更新凭证时才必填,
-  // 不然用户光是想改个名字都要翻出密钥重新输一遍。
-  const onlyIdChanged =
-    editing &&
-    id !== initial!.id &&
-    ak === initial!.accessKeyId &&
-    endpoint === initial!.endpoint &&
-    domain === (initial!.customDomain ?? "");
+  // 凭证(AK / Endpoint)没变时不强制重新输入密钥——密钥只在真的要更新凭证时才必填,
+  // 不然用户光是想改个别名 / 公共域名 / 预设 bucket 都要翻出密钥重新输一遍。
+  const credsUnchanged =
+    editing && ak === initial!.accessKeyId && endpoint === initial!.endpoint;
   const valid = editing
-    ? !!id && !!ak && !!endpoint && (!!sk || onlyIdChanged)
+    ? !!id && !!ak && !!endpoint && (!!sk || credsUnchanged)
     : !!id && !!ak && !!sk && !!endpoint;
 
   return (
@@ -102,7 +101,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           <label className="field">
             <span>
               {meta.skLabel}
-              {editing ? (onlyIdChanged ? "(仅改别名可留空)" : "(请重新输入)") : ""}
+              {editing ? (credsUnchanged ? "(不改凭证可留空)" : "(请重新输入)") : ""}
             </span>
             <input
               type="password"
@@ -129,6 +128,14 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
               placeholder="cdn.example.com — 设为公开读后用它拼永久直链"
             />
           </label>
+          <label className="field">
+            <span>预设 Bucket(可选)</span>
+            <input
+              value={bucket}
+              onChange={(e) => setBucket(e.target.value)}
+              placeholder="my-bucket — 打开账号直达,AK 只授权了单个桶时必填"
+            />
+          </label>
         </div>
 
         <div className="modal__footer">
@@ -138,7 +145,7 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           <button
             className="btn btn--primary"
             disabled={!valid}
-            onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain)}
+            onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain, bucket)}
           >
             {editing ? "保存" : "添加"}
           </button>

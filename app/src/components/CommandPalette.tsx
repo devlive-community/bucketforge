@@ -90,7 +90,7 @@ export function CommandPalette({
         kind: "account" as const,
         label: a.id,
         hint: a.vendor,
-        run: () => onJump(a.id, ""),
+        run: () => onJump(a.id, a.default_bucket),
       })),
       ...bookmarks.map((b) => ({
         key: `loc:${b.account}|${b.path}`,

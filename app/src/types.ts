@@ -49,6 +49,8 @@ export interface AccountInfo {
   endpoint: string;
   /** 自定义公共域名(CDN / CNAME);空表示未配置。 */
   custom_domain: string;
+  /** 预设 bucket(打开账号直达,根目录只列它);空表示未配置。 */
+  default_bucket: string;
 }
 
 /** 一个收藏的位置(账号 + 路径),与 Rust 端 app_core::Bookmark 对应。 */

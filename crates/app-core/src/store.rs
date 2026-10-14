@@ -16,6 +16,9 @@ pub struct AccountRecord {
     pub endpoint: String,
     /// 可选的自定义公共域名(CDN / CNAME);设了就用它拼永久公共直链。空表示未配置。
     pub custom_domain: String,
+    /// 预设 bucket:设了就打开账号直达该桶,账号根目录也只列它(不调 ListBuckets,
+    /// 适配只授权了单个桶的 AK)。空表示未配置。
+    pub default_bucket: String,
 }
 
 /// 基于 SQLite 的账号存储。跨命令线程共享,内部用 Mutex 串行化访问。
@@ -34,7 +37,8 @@ impl AccountStore {
                 access_key_id     TEXT NOT NULL,
                 access_key_secret TEXT NOT NULL,
                 endpoint          TEXT NOT NULL,
-                custom_domain     TEXT NOT NULL DEFAULT ''
+                custom_domain     TEXT NOT NULL DEFAULT '',
+                default_bucket    TEXT NOT NULL DEFAULT ''
             );
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
@@ -101,6 +105,11 @@ impl AccountStore {
             "ALTER TABLE accounts ADD COLUMN custom_domain TEXT NOT NULL DEFAULT ''",
             [],
         );
+        // 预设 bucket 列(1.13.0 及更早没有);已存在则忽略错误。
+        let _ = conn.execute(
+            "ALTER TABLE accounts ADD COLUMN default_bucket TEXT NOT NULL DEFAULT ''",
+            [],
+        );
         // sync_jobs 的上次结果列(早期没有);已存在则忽略。
         let _ = conn.execute(
             "ALTER TABLE sync_jobs ADD COLUMN last_result TEXT NOT NULL DEFAULT ''",
@@ -115,7 +124,8 @@ impl AccountStore {
     pub fn list(&self) -> rusqlite::Result<Vec<AccountRecord>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain
+            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain,
+                    default_bucket
              FROM accounts ORDER BY id",
         )?;
         let rows = stmt.query_map([], |r| {
@@ -126,6 +136,7 @@ impl AccountStore {
                 access_key_secret: r.get(3)?,
                 endpoint: r.get(4)?,
                 custom_domain: r.get(5)?,
+                default_bucket: r.get(6)?,
             })
         })?;
         rows.collect()
@@ -134,7 +145,8 @@ impl AccountStore {
     /// 新增或更新一条账号(按 id 覆盖)。
     pub fn upsert(&self, rec: &AccountRecord) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
-        // custom_domain 不在这里覆盖(编辑账号凭证时保留已配置的域名),改用 set_custom_domain。
+        // custom_domain / default_bucket 不在这里覆盖(编辑账号凭证时保留已配置的值),
+        // 改用 set_custom_domain / set_default_bucket。
         conn.execute(
             "INSERT INTO accounts (id, vendor, access_key_id, access_key_secret, endpoint, custom_domain)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -162,11 +174,22 @@ impl AccountStore {
         Ok(())
     }
 
+    /// 单独更新某账号的预设 bucket(不动凭证)。
+    pub fn set_default_bucket(&self, id: &str, bucket: &str) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE accounts SET default_bucket = ?2 WHERE id = ?1",
+            params![id, bucket],
+        )?;
+        Ok(())
+    }
+
     /// 按 id 读取一条账号(用于取自定义域名等)。
     pub fn get(&self, id: &str) -> rusqlite::Result<Option<AccountRecord>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain
+            "SELECT id, vendor, access_key_id, access_key_secret, endpoint, custom_domain,
+                    default_bucket
              FROM accounts WHERE id = ?1",
             params![id],
             |r| {
@@ -177,6 +200,7 @@ impl AccountStore {
                     access_key_secret: r.get(3)?,
                     endpoint: r.get(4)?,
                     custom_domain: r.get(5)?,
+                    default_bucket: r.get(6)?,
                 })
             },
         )
@@ -589,6 +613,7 @@ mod tests {
             access_key_secret: "sk".into(),
             endpoint: "oss-cn-hangzhou.aliyuncs.com".into(),
             custom_domain: String::new(),
+            default_bucket: String::new(),
         }
     }
 

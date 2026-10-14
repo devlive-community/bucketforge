@@ -115,6 +115,8 @@ export const renameAccount = (id: string, newId: string) =>
 /** 设置某账号的自定义公共域名(CDN / CNAME);空串清除。 */
 export const setAccountDomain = (id: string, domain: string) =>
   invoke<void>("set_account_domain", { id, domain });
+export const setAccountDefaultBucket = (id: string, bucket: string) =>
+  invoke<void>("set_account_default_bucket", { id, bucket });
 
 export const getAccount = (id: string) =>
   invoke<AccountInfo | null>("get_account", { id });
