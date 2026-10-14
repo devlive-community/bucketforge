@@ -51,7 +51,7 @@ dependencies = [
 
 [[package]]
 name = "aliyun-oss"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -82,7 +82,7 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "app-core"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-image",
@@ -243,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "aws-s3"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -252,7 +252,7 @@ dependencies = [
 
 [[package]]
 name = "backblaze-b2"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -321,7 +321,7 @@ dependencies = [
 
 [[package]]
 name = "bucketforge-image"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "image",
  "kamadak-exif",
@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "bucketforge-matting"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "image",
  "ort",
@@ -340,7 +340,7 @@ dependencies = [
 
 [[package]]
 name = "bucketforge-pdf"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "lopdf",
  "serde",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "bucketforge-provider"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "cloud-core"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-stream",
  "base64",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "cloudflare-r2"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "s3-core",
 ]
@@ -677,7 +677,7 @@ dependencies = [
 
 [[package]]
 name = "digitalocean-spaces"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -1078,7 +1078,7 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "huawei-obs"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -1381,7 +1381,7 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jdcloud-oss"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -1665,7 +1665,7 @@ checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
 name = "minio-s3"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "s3-core",
 ]
@@ -1981,7 +1981,7 @@ dependencies = [
 
 [[package]]
 name = "provider-aliyun"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "aliyun-oss",
  "async-trait",
@@ -1993,7 +1993,7 @@ dependencies = [
 
 [[package]]
 name = "provider-aws"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "aws-s3",
@@ -2005,7 +2005,7 @@ dependencies = [
 
 [[package]]
 name = "provider-b2"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "backblaze-b2",
@@ -2017,7 +2017,7 @@ dependencies = [
 
 [[package]]
 name = "provider-do-spaces"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2029,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "provider-huawei"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2041,7 +2041,7 @@ dependencies = [
 
 [[package]]
 name = "provider-jdcloud"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2053,7 +2053,7 @@ dependencies = [
 
 [[package]]
 name = "provider-minio"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2065,7 +2065,7 @@ dependencies = [
 
 [[package]]
 name = "provider-qiniu"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2077,7 +2077,7 @@ dependencies = [
 
 [[package]]
 name = "provider-r2"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2089,7 +2089,7 @@ dependencies = [
 
 [[package]]
 name = "provider-scaleway"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2101,7 +2101,7 @@ dependencies = [
 
 [[package]]
 name = "provider-tencent"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2113,7 +2113,7 @@ dependencies = [
 
 [[package]]
 name = "provider-upyun"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2125,7 +2125,7 @@ dependencies = [
 
 [[package]]
 name = "provider-us3"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2137,7 +2137,7 @@ dependencies = [
 
 [[package]]
 name = "provider-wasabi"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "async-trait",
  "bucketforge-provider",
@@ -2178,7 +2178,7 @@ checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
 name = "qiniu-kodo"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -2581,7 +2581,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "s3-core"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -2596,7 +2596,7 @@ dependencies = [
 
 [[package]]
 name = "s3-sigv4"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -2606,7 +2606,7 @@ dependencies = [
 
 [[package]]
 name = "scaleway-object-storage"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -2880,7 +2880,7 @@ dependencies = [
 
 [[package]]
 name = "tencent-cos"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "bytes",
  "cloud-core",
@@ -3112,7 +3112,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "ucloud-us3"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -3154,7 +3154,7 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "upyun-uss"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",
@@ -3213,7 +3213,7 @@ dependencies = [
 
 [[package]]
 name = "wasabi-s3"
-version = "1.14.0"
+version = "1.15.0"
 dependencies = [
  "futures",
  "s3-core",

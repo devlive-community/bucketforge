@@ -1,6 +1,6 @@
 [package]
 name = "bucketforge-app"
-version = "1.14.0"
+version = "1.15.0"
 description = "BucketForge multi-cloud storage manager (Tauri desktop app)"
 edition = "2021"
 publish = false
