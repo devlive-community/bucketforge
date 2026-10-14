@@ -8,8 +8,8 @@
 //!
 //! 能力矩阵已对照 UCloud 官方文档逐项核实,是目前接入的 S3 兼容厂商里限制最多的一个:
 //! 分片上传、对象 ACL(`private`/`public-read`/`public-read-write` 三种 canned 值,是
-//! Nebula 现有二态实现的超集)、生命周期规则(官方文档写明"部分地域支持",和 Scaleway
-//! `GLACIER` 只在两个地域可用同一个道理——Nebula 拿不到桶所在地域是否支持的信息,不做
+//! BucketForge 现有二态实现的超集)、生命周期规则(官方文档写明"部分地域支持",和 Scaleway
+//! `GLACIER` 只在两个地域可用同一个道理——BucketForge 拿不到桶所在地域是否支持的信息,不做
 //! 客户端提前拦截,交给后端报错)确认支持;版本控制、对象标签官方文档明确写"暂不支持";
 //! CORS 配置接口没有出现在官方 API 支持列表里,静态网站托管官方文档完全没有提及,均标不
 //! 支持;存储类型转换虽然官方文档给了 US3⇄S3 存储类型的映射表(STANDARD/IA/ARCHIVE),
@@ -21,7 +21,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
     ProgressFn, ProviderError, Result, StorageProvider,
 };
@@ -135,7 +135,7 @@ impl StorageProvider for Us3Provider {
             // 官方文档明确写"暂不支持"对象标签。
             object_tagging: false,
             multipart_cleanup: true,
-            // 官方文档:private/public-read/public-read-write 三种 canned 值,是 Nebula
+            // 官方文档:private/public-read/public-read-write 三种 canned 值,是 BucketForge
             // set_object_acl(path, public: bool) 现有二态实现的超集。
             object_acl: true,
             // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
@@ -194,10 +194,14 @@ impl StorageProvider for Us3Provider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -221,7 +225,7 @@ impl StorageProvider for Us3Provider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -338,7 +342,7 @@ impl StorageProvider for Us3Provider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

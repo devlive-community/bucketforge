@@ -1,16 +1,16 @@
 ---
 title: 加一个新的云端操作,大部分工作量都在"续上现成的骨架"
 date: 2026-08-03
-author: Nebula Team
+author: BucketForge Team
 description: 给 Bucket 加生命周期规则(到期删除 / 转归档),七个厂商听起来是七份工作。实际去做才发现:trait 默认方法 + 能力位的骨架早就在那儿了,真正要小心的只有阿里云和华为云签名里一张"子资源白名单"。
 tags: ['开发', '对象存储', '架构', '签名']
 ---
 
-Nebula 这次加了 **Bucket 生命周期规则**:按前缀匹配对象,多少天后转存储类型、多少天后直接删除——对象存储管理器少不了的存储治理能力。七家云,一开始以为要写七份实现,真正做完发现:骨架早就在,新工作量其实很集中。
+BucketForge 这次加了 **Bucket 生命周期规则**:按前缀匹配对象,多少天后转存储类型、多少天后直接删除——对象存储管理器少不了的存储治理能力。七家云,一开始以为要写七份实现,真正做完发现:骨架早就在,新工作量其实很集中。
 
 ## 骨架:trait 默认方法 + 能力位
 
-`set_storage_class` / `restore` / `set_object_acl` 这些"厂商各异的操作"在 Nebula 里都是同一个形状:
+`set_storage_class` / `restore` / `set_object_acl` 这些"厂商各异的操作"在 BucketForge 里都是同一个形状:
 
 ```rust
 async fn bucket_lifecycle(&self, _bucket: &str) -> Result<Vec<LifecycleRule>> {
@@ -25,7 +25,7 @@ trait 默认返回"不支持",支持的适配层覆盖,同时在 `Capabilities` 
 
 ## 真正的工作量在四份 SDK,不是七份
 
-Nebula 支持的七家云里,AWS / Cloudflare R2 / MinIO / 七牛云 Kodo 共用同一个 `s3-core`(它们都走 S3 协议 + SigV4,只是 endpoint 和 region 处理不同)。所以生命周期规则的 XML 构造与解析只需要写**四份**:`s3-core`(覆盖前三家)、阿里云 OSS、华为云 OBS、腾讯云 COS。七牛云虽然也走 `s3-core` 门面,但它真实的生命周期规则是管理台专有 API,不是 S3 兼容的 `?lifecycle`——这次先老实标成不支持(`capabilities().bucket_lifecycle = false`),和其它"某厂商暂未实现"的能力位一样处理,不硬凑。
+BucketForge 支持的七家云里,AWS / Cloudflare R2 / MinIO / 七牛云 Kodo 共用同一个 `s3-core`(它们都走 S3 协议 + SigV4,只是 endpoint 和 region 处理不同)。所以生命周期规则的 XML 构造与解析只需要写**四份**:`s3-core`(覆盖前三家)、阿里云 OSS、华为云 OBS、腾讯云 COS。七牛云虽然也走 `s3-core` 门面,但它真实的生命周期规则是管理台专有 API,不是 S3 兼容的 `?lifecycle`——这次先老实标成不支持(`capabilities().bucket_lifecycle = false`),和其它"某厂商暂未实现"的能力位一样处理,不硬凑。
 
 四份实现的请求形状几乎一样:`GET/PUT/DELETE /?lifecycle`,手写 XML 构造 + `quick_xml` 反序列化——和已经写过的 `PutObjectTagging`/`RestoreObject`/`CreateBucketConfiguration` 是同一套技术栈,不是新东西:
 
@@ -86,14 +86,14 @@ pub(crate) struct PartRequest<'a> {
 
 ## SDK 层不认识 App 的类型
 
-Nebula 的四家"纯 SDK"crate(`s3-core`、`aliyun-oss`、`huawei-obs`、`tencent-cos`)是独立的、面向 crates.io 发布的库,不依赖 `nebula-provider`——这意味着它们不能直接用 App 层的 `LifecycleRule`。每个 SDK crate 都定义了自己的本地版本(字段完全一样),真正的转换发生在**适配层**(`provider-aliyun` 这类"只在 App 内部用、不发布"的胶水 crate):
+BucketForge 的四家"纯 SDK"crate(`s3-core`、`aliyun-oss`、`huawei-obs`、`tencent-cos`)是独立的、面向 crates.io 发布的库,不依赖 `bucketforge-provider`——这意味着它们不能直接用 App 层的 `LifecycleRule`。每个 SDK crate 都定义了自己的本地版本(字段完全一样),真正的转换发生在**适配层**(`provider-aliyun` 这类"只在 App 内部用、不发布"的胶水 crate):
 
 ```rust
-fn rule_from_sdk(r: aliyun_oss::LifecycleRule) -> nebula_provider::LifecycleRule { ... }
-fn rule_to_sdk(r: &nebula_provider::LifecycleRule) -> aliyun_oss::LifecycleRule { ... }
+fn rule_from_sdk(r: aliyun_oss::LifecycleRule) -> bucketforge_provider::LifecycleRule { ... }
+fn rule_to_sdk(r: &bucketforge_provider::LifecycleRule) -> aliyun_oss::LifecycleRule { ... }
 ```
 
-看着像重复定义了五次同一个结构体(四个 SDK + 一个 App 层),但这正是"可独立发布的 SDK"必须付出的代价——如果 `aliyun-oss` 直接引用 `nebula_provider::LifecycleRule`,它就不再是一个独立的 OSS SDK,而是绑死在这个 App 的私有抽象上了。
+看着像重复定义了五次同一个结构体(四个 SDK + 一个 App 层),但这正是"可独立发布的 SDK"必须付出的代价——如果 `aliyun-oss` 直接引用 `bucketforge_provider::LifecycleRule`,它就不再是一个独立的 OSS SDK,而是绑死在这个 App 的私有抽象上了。
 
 ## 小结
 

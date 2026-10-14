@@ -665,7 +665,7 @@ fn parse_object_acl(xml: &str) -> Result<(String, Vec<AclGrant>)> {
 
 /// 生成 `PutObjectAcl` 的请求体 XML。`owner_id` 来自同一个对象先前的 `GetObjectAcl`
 /// 响应——请求体必须带 Owner,服务端不会替调用方补全。`Delivered` 固定 `false`(是否把
-/// 权限下发给桶所有者的委托子用户,Nebula 不建模这层)。
+/// 权限下发给桶所有者的委托子用户,BucketForge 不建模这层)。
 fn build_object_acl_xml(owner_id: &str, grants: &[AclGrant]) -> String {
     let mut body = String::from("<AccessControlPolicy><Owner><ID>");
     body.push_str(&xml_escape(owner_id));

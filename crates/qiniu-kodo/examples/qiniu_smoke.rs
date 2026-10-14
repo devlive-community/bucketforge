@@ -23,8 +23,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bucket = env::var("KODO_BUCKET").expect("需要设置 KODO_BUCKET");
 
     let client = KodoClient::new(ak, sk, endpoint);
-    let key = "nebula-smoke-test.txt";
-    let content = b"hello from nebula qiniu-kodo smoke test";
+    let key = "bucketforge-smoke-test.txt";
+    let content = b"hello from bucketforge qiniu-kodo smoke test";
 
     println!("bucket = {bucket}, region = {}\n", client.region());
 
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[5/5] delete_object ✅ 已清理临时对象");
 
     // 6) 分片上传(强制多片):造 11MB 数据(每片下限 5MiB)
-    let mp_key = "nebula-smoke-multipart.bin";
+    let mp_key = "bucketforge-smoke-multipart.bin";
     let part_size = qiniu_kodo::multipart::MIN_PART_SIZE; // 5 MiB
     let big: Vec<u8> = (0..(part_size * 2 + 12345))
         .map(|i| (i % 251) as u8)

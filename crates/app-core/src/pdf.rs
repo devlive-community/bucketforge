@@ -1,9 +1,9 @@
-//! PDF 页面级编辑:后端用 `nebula-pdf`(纯 Rust lopdf)解析与改写,读云端、写回云端。
+//! PDF 页面级编辑:后端用 `bucketforge-pdf`(纯 Rust lopdf)解析与改写,读云端、写回云端。
 //!
 //! 前端负责 pdf.js 渲染缩略图与交互;所有结构解析 / 组装(删除 / 重排 / 旋转 / 合并 /
 //! 提取)都在 Rust 侧完成,大文件也不阻塞界面。
 
-use nebula_pdf::{Assembly, PageNumbers, PdfInfo, Watermark};
+use bucketforge_pdf::{Assembly, PageNumbers, PdfInfo, Watermark};
 
 use crate::{App, AppError, Result};
 
@@ -11,7 +11,7 @@ impl App {
     /// 读取 PDF 的页面概览(页数、每页尺寸与旋转)。
     pub async fn pdf_info(&self, account: &str, path: &str) -> Result<PdfInfo> {
         let bytes = self.provider(account)?.read(path).await?.to_vec();
-        tokio::task::spawn_blocking(move || nebula_pdf::info(&bytes))
+        tokio::task::spawn_blocking(move || bucketforge_pdf::info(&bytes))
             .await
             .map_err(|e| AppError::Image(e.to_string()))?
             .map_err(|e| AppError::Image(e.to_string()))
@@ -25,7 +25,7 @@ impl App {
     /// 抽取 PDF 每页纯文本(用于复制 / 导出 txt)。
     pub async fn pdf_text(&self, account: &str, path: &str) -> Result<Vec<String>> {
         let bytes = self.provider(account)?.read(path).await?.to_vec();
-        tokio::task::spawn_blocking(move || nebula_pdf::extract_text(&bytes))
+        tokio::task::spawn_blocking(move || bucketforge_pdf::extract_text(&bytes))
             .await
             .map_err(|e| AppError::Image(e.to_string()))?
             .map_err(|e| AppError::Image(e.to_string()))
@@ -39,10 +39,11 @@ impl App {
         dest: &str,
     ) -> Result<(usize, usize)> {
         let bytes = self.provider(account)?.read(path).await?.to_vec();
-        let (out, orig, new) = tokio::task::spawn_blocking(move || nebula_pdf::compress(&bytes))
-            .await
-            .map_err(|e| AppError::Image(e.to_string()))?
-            .map_err(|e| AppError::Image(e.to_string()))?;
+        let (out, orig, new) =
+            tokio::task::spawn_blocking(move || bucketforge_pdf::compress(&bytes))
+                .await
+                .map_err(|e| AppError::Image(e.to_string()))?
+                .map_err(|e| AppError::Image(e.to_string()))?;
         self.provider(account)?
             .write(dest, bytes::Bytes::from(out), Some("application/pdf"))
             .await?;
@@ -67,7 +68,7 @@ impl App {
         docs.extend(sources);
         tokio::task::spawn_blocking(move || {
             let refs: Vec<&[u8]> = docs.iter().map(|d| d.as_slice()).collect();
-            nebula_pdf::assemble(&refs, &asm)
+            bucketforge_pdf::assemble(&refs, &asm)
         })
         .await
         .map_err(|e| AppError::Image(e.to_string()))?
@@ -113,11 +114,12 @@ impl App {
         dest: &str,
     ) -> Result<()> {
         let assembled = self.pdf_assemble(account, path, sources, asm).await?;
-        let out =
-            tokio::task::spawn_blocking(move || nebula_pdf::add_page_numbers(&assembled, &opts))
-                .await
-                .map_err(|e| AppError::Image(e.to_string()))?
-                .map_err(|e| AppError::Image(e.to_string()))?;
+        let out = tokio::task::spawn_blocking(move || {
+            bucketforge_pdf::add_page_numbers(&assembled, &opts)
+        })
+        .await
+        .map_err(|e| AppError::Image(e.to_string()))?
+        .map_err(|e| AppError::Image(e.to_string()))?;
         self.provider(account)?
             .write(dest, bytes::Bytes::from(out), Some("application/pdf"))
             .await?;
@@ -135,10 +137,11 @@ impl App {
         dest: &str,
     ) -> Result<()> {
         let assembled = self.pdf_assemble(account, path, sources, asm).await?;
-        let out = tokio::task::spawn_blocking(move || nebula_pdf::add_watermark(&assembled, &wm))
-            .await
-            .map_err(|e| AppError::Image(e.to_string()))?
-            .map_err(|e| AppError::Image(e.to_string()))?;
+        let out =
+            tokio::task::spawn_blocking(move || bucketforge_pdf::add_watermark(&assembled, &wm))
+                .await
+                .map_err(|e| AppError::Image(e.to_string()))?
+                .map_err(|e| AppError::Image(e.to_string()))?;
         self.provider(account)?
             .write(dest, bytes::Bytes::from(out), Some("application/pdf"))
             .await?;

@@ -1,8 +1,8 @@
 ---
 title: 第三家"S3 兼容"的云，第一次连 endpoint 都不按套路来
 date: 2026-08-04
-author: Nebula Team
-description: B2 和 Wasabi 的 endpoint 都是 s3.{region}.xxx.com 这个形状，现成的 region 解析代码直接就能用。DigitalOcean Spaces 打破了这个巧合——endpoint 不带 s3. 前缀，得照抄 R2/MinIO 那套"专用构造函数"的老办法。但这次也有个意外的好消息：它的对象 ACL 限制恰好和 Nebula 现有实现完全对齐。
+author: BucketForge Team
+description: B2 和 Wasabi 的 endpoint 都是 s3.{region}.xxx.com 这个形状，现成的 region 解析代码直接就能用。DigitalOcean Spaces 打破了这个巧合——endpoint 不带 s3. 前缀，得照抄 R2/MinIO 那套"专用构造函数"的老办法。但这次也有个意外的好消息：它的对象 ACL 限制恰好和 BucketForge 现有实现完全对齐。
 tags: ['开发', '对象存储', '架构']
 ---
 
@@ -55,7 +55,7 @@ pub fn new_client(
 
 前两轮的能力矩阵调研大多是"发现某个功能不支持,或者支持得有各种限制,要老实标注"。这次有一项难得
 的例外:DigitalOcean Spaces 的对象 ACL **只有两种 canned 值**——`private` 和 `public-read`。
-这恰好是 Nebula 现在 `set_object_acl(path, public: bool)` 唯一会发送的两个值:
+这恰好是 BucketForge 现在 `set_object_acl(path, public: bool)` 唯一会发送的两个值:
 
 ```rust
 async fn set_object_acl(&self, path: &str, public: bool) -> Result<()> {
@@ -67,7 +67,7 @@ async fn set_object_acl(&self, path: &str, public: bool) -> Result<()> {
 
 Wasabi 那轮虽然也支持这两个 canned 值,但额外有一层"公开访问效果可能被账号等级(免费/试用 vs
 付费)限制"的复杂度,调用可能语法成功但实际不生效。Spaces 这边没有这层额外限制——它的能力边界
-恰好卡在 Nebula 现有实现的边界上,不多不少。这算是"厂商限制反而和我们的设计天然吻合"的一次
+恰好卡在 BucketForge 现有实现的边界上,不多不少。这算是"厂商限制反而和我们的设计天然吻合"的一次
 正面案例,不是每次调研都能这么顺。
 
 ## 存储类型转换:这次连"转换"这个动作的对象都不对
@@ -76,7 +76,7 @@ B2 不支持存储类型转换是因为没查到对应的头;Wasabi 是因为只
 Spaces 这次的原因更进一步——它确实有两种"存储类型"(Standard 和 Cold Storage),但这是**建桶
 时的选择**,是桶级属性,不是 S3 那种"对象随时可以用 `x-amz-storage-class` 转换"的对象级操作。
 更关键的是,官方文档明确写了 `CopyObject` 在 Standard 和 Cold Storage 两种桶之间**不通**——而
-Nebula 的 `set_storage_class` 正是靠"带新存储类型头的自我复制"实现的,这条实现路径在 Spaces 上
+BucketForge 的 `set_storage_class` 正是靠"带新存储类型头的自我复制"实现的,这条实现路径在 Spaces 上
 完全走不通,不是"支持但没测",是"这条路本身就断了"。三次踩到同一个能力位不支持,原因却一次比一次
 不一样,这本身就说明"存储类型转换"这个概念在不同云厂商那里的建模方式差异有多大。
 

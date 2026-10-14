@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Nebula default capability set",
+  "description": "BucketForge default capability set",
   "windows": ["main", "image-*", "pdf-*"],
   "permissions": [
     "core:default",

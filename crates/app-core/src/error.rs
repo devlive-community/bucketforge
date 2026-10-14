@@ -12,7 +12,7 @@ pub enum AppError {
 
     /// 来自底层 provider 的错误。
     #[error(transparent)]
-    Provider(#[from] nebula_provider::ProviderError),
+    Provider(#[from] bucketforge_provider::ProviderError),
 
     /// 账号持久化(SQLite)错误。
     #[error("storage error: {0}")]

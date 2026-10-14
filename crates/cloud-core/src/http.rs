@@ -26,7 +26,10 @@ impl HttpClient {
         let inner = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .read_timeout(Duration::from_secs(60))
-            .user_agent(concat!("nebula-cloud-core/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!(
+                "bucketforge-cloud-core/",
+                env!("CARGO_PKG_VERSION")
+            ))
             .build()
             .expect("default reqwest client should build");
         Self {

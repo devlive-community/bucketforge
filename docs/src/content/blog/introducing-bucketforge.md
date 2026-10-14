@@ -1,20 +1,20 @@
 ---
 title: 用 Rust + Tauri 做一个多云对象存储管理器,聊聊三层解耦的架构
 date: 2026-07-07
-author: Nebula Team
-description: 各家云的对象存储 SDK 在 Rust 生态里参差不齐,想做一个统一界面就得先把"厂商差异"关在一个笼子里。Nebula 用三层解耦把 SDK、抽象层和界面彻底分开。
+author: BucketForge Team
+description: 各家云的对象存储 SDK 在 Rust 生态里参差不齐,想做一个统一界面就得先把"厂商差异"关在一个笼子里。BucketForge 用三层解耦把 SDK、抽象层和界面彻底分开。
 tags: ['公告', '架构']
 ---
 
-> 项目在这里:<https://github.com/devlive-community/nebula>。如果你也在用 Tauri 做桌面工具,或者被国内云的对象存储 SDK 折腾过,这篇也许能帮你少走点弯路。
+> 项目在这里:<https://github.com/devlive-community/bucketforge>。如果你也在用 Tauri 做桌面工具,或者被国内云的对象存储 SDK 折腾过,这篇也许能帮你少走点弯路。
 
-## 为什么做 Nebula
+## 为什么做 BucketForge
 
 对象存储人人都在用,但每家云的控制台都长得不一样,命令行工具又各说各话。我想要的很简单:**一个界面,管理我所有云上的对象存储**——浏览、上传下载、分享,像本地文件管理器一样顺手。
 
 ## 三层解耦
 
-Nebula 的核心是把"厂商差异"关进最底层,让上层完全无感:
+BucketForge 的核心是把"厂商差异"关进最底层,让上层完全无感:
 
 ```
 cloud-core  →  各厂商 SDK  →  provider 适配层  →  app
@@ -37,4 +37,4 @@ Tauri 的后端是 Rust,前端是 React。我们把业务逻辑放在一个框�
 
 ## 接下来
 
-首发接入了阿里云 OSS。腾讯云 COS、华为云 OBS、AWS S3 等都可以按同一套《SDK 开发手册》复刻。欢迎来 [GitHub](https://github.com/devlive-community/nebula) 一起玩。
+首发接入了阿里云 OSS。腾讯云 COS、华为云 OBS、AWS S3 等都可以按同一套《SDK 开发手册》复刻。欢迎来 [GitHub](https://github.com/devlive-community/bucketforge) 一起玩。

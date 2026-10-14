@@ -1,28 +1,28 @@
 ---
 title: 从搜文件名到搜文件内容:让云盘也能「grep」文本与 PDF
 date: 2026-07-26
-author: Nebula Team
-description: 按文件名搜只能找到「你还记得名字」的东西。这篇讲 Nebula 怎么在云端文件夹里搜文件**内容**——文本文件直接解码、PDF 复用已有的文本提取,带上下文片段;以及为什么这个功能必须自带成本上限、片段生成为什么写成一个纯函数。
+author: BucketForge Team
+description: 按文件名搜只能找到「你还记得名字」的东西。这篇讲 BucketForge 怎么在云端文件夹里搜文件**内容**——文本文件直接解码、PDF 复用已有的文本提取,带上下文片段;以及为什么这个功能必须自带成本上限、片段生成为什么写成一个纯函数。
 tags: ['开发', '对象存储', '搜索', 'PDF']
 ---
 
 按文件名搜索很有用,但它只能找到你**还记得名字**的文件。真实场景常常反过来:「我知道某份合同里提到过某个条款,但不记得文件叫什么了。」这时候需要的是搜**内容**——在一堆文件里 grep。
 
-Nebula 现在支持在云端文件夹里做内容搜索:文本类文件与 PDF 都能搜,命中后给一段带上下文的片段。
+BucketForge 现在支持在云端文件夹里做内容搜索:文本类文件与 PDF 都能搜,命中后给一段带上下文的片段。
 
 ## 复用已有能力,不重复造轮子
 
-内容搜索听起来是个新功能,但它需要的两块能力 Nebula 早就有了:
+内容搜索听起来是个新功能,但它需要的两块能力 BucketForge 早就有了:
 
 - **读云端字节**:`provider.read` 已经在下载、预览、同步里用了无数次;
-- **从 PDF 里抽文本**:做 PDF 编辑器时写的 `nebula_pdf::extract_text` 正好拿来用。
+- **从 PDF 里抽文本**:做 PDF 编辑器时写的 `bucketforge_pdf::extract_text` 正好拿来用。
 
 于是内容搜索的核心就很短:走文件夹收集候选文件,逐个读字节,按类型抽成文本,再匹配关键字。
 
 ```rust
 let text = if ext_of(&entry.name) == "pdf" {
     // PDF:复用编辑器那套文本提取
-    nebula_pdf::extract_text(&bytes)?.join("\n")
+    bucketforge_pdf::extract_text(&bytes)?.join("\n")
 } else {
     // 文本类:UTF-8 有损解码(遇到非法字节用 � 代替,不报错)
     String::from_utf8_lossy(&bytes).into_owned()

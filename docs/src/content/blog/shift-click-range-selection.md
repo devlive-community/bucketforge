@@ -1,12 +1,12 @@
 ---
 title: Shift 多选看着是个 checkbox 小事,其实是"当前视图顺序"的事
 date: 2026-07-25
-author: Nebula Team
+author: BucketForge Team
 description: 给文件列表加 Shift 范围多选,真正的难点不是监听 Shift 键,而是同一个功能要在列表、网格、搜索结果三种不同顺序的视图里都选出"看起来对"的那一段。
 tags: ['开发', '前端', '交互']
 ---
 
-Nebula 的多选一直只能一个个点 checkbox。这次补上大家在文件管理器里习惯的操作:点一个,按住 Shift 点另一个,中间整段都选中。
+BucketForge 的多选一直只能一个个点 checkbox。这次补上大家在文件管理器里习惯的操作:点一个,按住 Shift 点另一个,中间整段都选中。
 
 ## 先记住"锚点",而不是"上一次点的"
 

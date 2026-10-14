@@ -25,8 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bucket = env::var("OBS_BUCKET").expect("需要设置 OBS_BUCKET");
 
     let client = ObsClient::new(ak, sk, endpoint);
-    let key = "nebula-smoke-test.txt";
-    let content = b"hello from nebula huawei-obs smoke test";
+    let key = "bucketforge-smoke-test.txt";
+    let content = b"hello from bucketforge huawei-obs smoke test";
 
     println!("bucket = {bucket}, key = {key}\n");
 
@@ -92,7 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[5/5] delete_object ✅ 已清理临时对象");
 
     // 6) 分片上传(验证子资源签名路径):造 250KB 数据,强制切成多片
-    let mp_key = "nebula-smoke-multipart.bin";
+    let mp_key = "bucketforge-smoke-multipart.bin";
     let part_size = huawei_obs::multipart::MIN_PART_SIZE; // 100KB
     let big: Vec<u8> = (0..(part_size * 2 + 12345))
         .map(|i| (i % 251) as u8)

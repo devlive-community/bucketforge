@@ -1,7 +1,7 @@
 [package]
 name = "app-core"
 version.workspace = true
-description = "Framework-agnostic Nebula app logic over the provider registry (used by the Tauri shell)"
+description = "Framework-agnostic BucketForge app logic over the provider registry (used by the Tauri shell)"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,10 +10,10 @@ publish = false
 
 [dependencies]
 cloud-core = { path = "../cloud-core" }
-nebula-provider = { path = "../nebula-provider" }
-nebula-image = { path = "../nebula-image" }
-nebula-matting = { path = "../nebula-matting" }
-nebula-pdf = { path = "../nebula-pdf" }
+bucketforge-provider = { path = "../bucketforge-provider" }
+bucketforge-image = { path = "../bucketforge-image" }
+bucketforge-matting = { path = "../bucketforge-matting" }
+bucketforge-pdf = { path = "../bucketforge-pdf" }
 provider-aliyun = { path = "../providers/provider-aliyun" }
 provider-tencent = { path = "../providers/provider-tencent" }
 provider-huawei = { path = "../providers/provider-huawei" }

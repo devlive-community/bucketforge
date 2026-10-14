@@ -6,7 +6,7 @@
 //!
 //! 能力矩阵已对照 Backblaze 官方文档逐项核实(不是从 R2/MinIO 抄近似值):对象标签、
 //! 对象级 ACL 写入、静态网站托管官方文档明确写不支持;版本控制是"桶默认永远开启、没有
-//! 开关"这种和 Nebula `versioning` 能力位(开关 + 历史合一)不匹配的语义,故也标不支持;
+//! 开关"这种和 BucketForge `versioning` 能力位(开关 + 历史合一)不匹配的语义,故也标不支持;
 //! 存储类型转换未在文档中找到对应的头,保守不支持。生命周期规则、CORS、预签名、服务端
 //! 复制、分片上传均有文档明确支持。
 
@@ -15,7 +15,7 @@ use bytes::Bytes;
 use futures::StreamExt;
 
 use backblaze_b2::{ListEntry, S3Client, S3Error};
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule, ProgressFn,
     ProviderError, Result, StorageProvider,
 };
@@ -149,7 +149,7 @@ impl StorageProvider for B2Provider {
             hierarchical: false,
             // 官方博客确认 S3 兼容生命周期规则 API(Put/Get/Delete)已支持。
             bucket_lifecycle: true,
-            // B2 的桶默认永远开启版本、没有"启用/暂停"开关,和 Nebula 这个能力位"开关 +
+            // B2 的桶默认永远开启版本、没有"启用/暂停"开关,和 BucketForge 这个能力位"开关 +
             // 历史"合一的语义不匹配,宁可标不支持也不做半个功能。
             versioning: false,
             // 官方文档有专门的"如何用 S3 兼容 API 启用 CORS"页面。
@@ -196,10 +196,14 @@ impl StorageProvider for B2Provider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -223,7 +227,7 @@ impl StorageProvider for B2Provider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -340,7 +344,7 @@ impl StorageProvider for B2Provider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

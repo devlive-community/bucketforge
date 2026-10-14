@@ -1,7 +1,7 @@
 [package]
-name = "nebula-matting"
+name = "bucketforge-matting"
 version.workspace = true
-description = "AI background removal for Nebula (ONNX Runtime via ort, loaded dynamically as an optional plugin)"
+description = "AI background removal for BucketForge (ONNX Runtime via ort, loaded dynamically as an optional plugin)"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

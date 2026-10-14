@@ -1,6 +1,6 @@
-# Nebula 云厂商 SDK 开发手册
+# BucketForge 云厂商 SDK 开发手册
 
-本手册描述在 Nebula 里**从零手写一个云厂商 SDK crate** 的标准流程。所有厂商 SDK
+本手册描述在 BucketForge 里**从零手写一个云厂商 SDK crate** 的标准流程。所有厂商 SDK
 (`aliyun-oss`、`tencent-cos`、`huawei-obs`……)都遵循同一套流程与目录模板;每家**特有**
 的参数(签名算法、endpoint、子资源、错误结构)写在对应的《厂商规格卡》`docs/sdk/<crate>.md`。
 
@@ -12,9 +12,9 @@
 ## 0. 不可违反的架构红线
 
 1. **厂商 SDK 只能依赖 `cloud-core` + reqwest/serde/tokio 等基础库**,
-   **绝不能**依赖 `nebula-provider`、`app` 或其他厂商 SDK。违反即丧失独立发布价值。
+   **绝不能**依赖 `bucketforge-provider`、`app` 或其他厂商 SDK。违反即丧失独立发布价值。
 2. 依赖方向严格单向:`cloud-core → 厂商 SDK → providers 适配层 → app`。
-3. 厂商 SDK 用**厂商原名**(`aliyun-oss`,不是 `nebula-aliyun`),便于被搜索复用。
+3. 厂商 SDK 用**厂商原名**(`aliyun-oss`,不是 `bucketforge-aliyun`),便于被搜索复用。
 4. 签名的**通用积木**(HMAC/SHA/base64/hex/md5)放 `cloud-core::crypto`;
    **每家如何拼签名**放各自 SDK 的 `sign.rs`,不在 `cloud-core` 抽象。
 

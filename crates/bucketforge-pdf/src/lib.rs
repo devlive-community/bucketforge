@@ -1,4 +1,4 @@
-//! Nebula 的 PDF 页面级操作:纯 Rust(lopdf),无原生依赖,CI 可直接编译。
+//! BucketForge 的 PDF 页面级操作:纯 Rust(lopdf),无原生依赖,CI 可直接编译。
 //!
 //! 核心是一个统一的 [`assemble`]:给定若干源 PDF 与一份「输出由哪些页按什么顺序、
 //! 各自旋转多少度组成」的清单,产出新 PDF。它一并覆盖:

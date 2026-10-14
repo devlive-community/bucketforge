@@ -44,7 +44,7 @@ export function Sidebar({
     <aside className="sidebar" style={{ width }}>
       <div className="sidebar__brand">
         <Logo size={24} />
-        <span>Nebula</span>
+        <span>BucketForge</span>
       </div>
 
       <div className="sidebar__section-title">{t("账号")}</div>

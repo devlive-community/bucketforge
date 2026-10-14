@@ -7,12 +7,12 @@
             stroke="rgba(129,140,248,.55)" stroke-width="1.5"/>
     </svg>
 
-    <!-- 中心:Nebula -->
+    <!-- 中心:BucketForge -->
     <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
       <div class="grid place-items-center h-20 w-20 rounded-2xl bg-white/5 ring-1 ring-white/15 backdrop-blur shadow-glow">
-        <img src="/logo.svg" alt="Nebula" class="h-12 w-12"/>
+        <img src="/logo.svg" alt="BucketForge" class="h-12 w-12"/>
       </div>
-      <span class="text-sm font-semibold text-white">Nebula</span>
+      <span class="text-sm font-semibold text-white">BucketForge</span>
     </div>
 
     <!-- 各家云:统一尺寸的圆形徽章,按品牌色区分,不再用宽度随文字长度变化的胶囊 -->
@@ -55,7 +55,7 @@ const nodes = [
   {name: '又拍云', short: 'UP', color: '#2ac845'}
 ]
 
-// 均匀分布在中心 Nebula 周围(椭圆,顺时针,rx=42% ry=44%)。徽章现在是统一小尺寸的圆形,
+// 均匀分布在中心 BucketForge 周围(椭圆,顺时针,rx=42% ry=44%)。徽章现在是统一小尺寸的圆形,
 // 不再随文字长度变宽,加几家新厂商只需要在上面的 nodes 数组里追加一项,这里的角度
 // (360° / nodes.length)会自动重新摊匀,不用再逐个手调坐标。
 const placed = computed(() => {

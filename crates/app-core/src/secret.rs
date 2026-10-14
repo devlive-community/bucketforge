@@ -29,13 +29,15 @@ pub trait SecretStore: Send + Sync {
 }
 
 /// 合并存储所有账号密钥的那条钥匙串条目名。
-const BLOB_KEY: &str = "__nebula_secrets__";
+const BLOB_KEY: &str = "__bucketforge_secrets__";
 
 /// 系统钥匙串实现(macOS Keychain / Windows Credential / Linux Secret Service)。
 ///
 /// 所有密钥合并存进一条条目 [`BLOB_KEY`],首次读取后缓存,减少弹窗。
 pub struct KeyringSecrets {
     service: String,
+    /// 更名前的旧条目(服务名, 条目名);新条目不存在时回退读取并复制过来。
+    legacy: Option<(String, String)>,
     /// 内存缓存;`None` 表示尚未从钥匙串加载。
     cache: Mutex<Option<HashMap<String, String>>>,
 }
@@ -44,8 +46,15 @@ impl KeyringSecrets {
     pub fn new(service: impl Into<String>) -> Self {
         Self {
             service: service.into(),
+            legacy: None,
             cache: Mutex::new(None),
         }
+    }
+
+    /// 指定更名前的旧合并条目:新条目还不存在时从它读出并写入新条目(旧条目保留)。
+    pub fn with_legacy(mut self, service: impl Into<String>, key: impl Into<String>) -> Self {
+        self.legacy = Some((service.into(), key.into()));
+        self
     }
 
     fn blob_entry(&self) -> Result<keyring::Entry> {
@@ -63,12 +72,28 @@ impl KeyringSecrets {
         if guard.is_none() {
             let map = match self.blob_entry()?.get_password() {
                 Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
-                Err(keyring::Error::NoEntry) => HashMap::new(),
+                Err(keyring::Error::NoEntry) => self.load_legacy()?,
                 Err(e) => return Err(e.into()),
             };
             *guard = Some(map);
         }
         Ok(guard)
+    }
+
+    /// 读更名前的旧合并条目;读到非空就复制进新条目。没有旧条目时返回空表。
+    fn load_legacy(&self) -> Result<HashMap<String, String>> {
+        let Some((service, key)) = &self.legacy else {
+            return Ok(HashMap::new());
+        };
+        let map: HashMap<String, String> = match keyring::Entry::new(service, key)?.get_password() {
+            Ok(json) => serde_json::from_str(&json).unwrap_or_default(),
+            Err(keyring::Error::NoEntry) => return Ok(HashMap::new()),
+            Err(e) => return Err(e.into()),
+        };
+        if !map.is_empty() {
+            self.persist(&map)?;
+        }
+        Ok(map)
     }
 
     /// 把缓存写回合并条目。

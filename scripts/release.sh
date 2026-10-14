@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 一键发布 Nebula 新版本。
+# 一键发布 BucketForge 新版本。
 #
 # 做什么:预检 → 推送当前分支 → 打 tag `vX.Y.Z` 并推送 → 触发
 # .github/workflows/release.yml(多平台构建 + 签名 updater 产物 + 建**草稿** Release)。
@@ -124,11 +124,11 @@ note "推送分支 ${BRANCH}…"
 git push origin "${BRANCH}"
 
 note "打 tag ${TAG} 并推送…"
-git tag -a "${TAG}" -m "Nebula ${TAG}"
+git tag -a "${TAG}" -m "BucketForge ${TAG}"
 git push origin "${TAG}"
 
 echo "✓ 已推送 tag ${TAG},CI 发布流程已触发。"
-echo "  Actions: https://github.com/devlive-community/nebula/actions/workflows/release.yml"
+echo "  Actions: https://github.com/devlive-community/bucketforge/actions/workflows/release.yml"
 
 # ── 可选:跟踪构建 / 自动转正式发布 ────────────────────────────────────────
 if [ "$WATCH" -eq 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
@@ -149,10 +149,10 @@ if [ "$WATCH" -eq 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/n
       if [ "$PUBLISH" -eq 1 ]; then
         note "把草稿 Release ${TAG} 转为正式发布…"
         gh release edit "${TAG}" --draft=false --latest
-        echo "✓ ${TAG} 已正式发布:https://github.com/devlive-community/nebula/releases/tag/${TAG}"
+        echo "✓ ${TAG} 已正式发布:https://github.com/devlive-community/bucketforge/releases/tag/${TAG}"
         echo "  自动更新已对存量用户生效(latest.json 已可访问)。"
       else
-        echo "→ 到 Releases 页面复核草稿 Nebula ${TAG},确认无误后点 Publish。"
+        echo "→ 到 Releases 页面复核草稿 BucketForge ${TAG},确认无误后点 Publish。"
       fi
     else
       die "CI 构建失败;请查看日志:gh run view ${run_id} --log-failed"
@@ -162,7 +162,7 @@ else
   echo
   echo "接下来:"
   echo "  1. 在 Actions 里等三平台(macOS/Linux/Windows)构建完成"
-  echo "  2. 打开草稿 Release「Nebula ${TAG}」复核安装包与说明"
+  echo "  2. 打开草稿 Release「BucketForge ${TAG}」复核安装包与说明"
   echo "  3. 点 Publish release —— 发布后 latest.json 生效,自动更新对存量用户可用"
   echo
   echo "  (下次可用 scripts/release.sh $VERSION --publish 让脚本等构建成功后自动转正式发布)"

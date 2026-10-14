@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{App, AppError, Result};
 
-pub use nebula_image::{CropRect, ExifInfo, Ops};
+pub use bucketforge_image::{CropRect, ExifInfo, Ops};
 
 /// 保存编辑结果的目标:写到哪、什么格式、什么画质。
 #[derive(Debug, Clone, Deserialize)]
@@ -37,8 +37,8 @@ pub struct ImageData {
     pub orig_height: u32,
 }
 
-impl From<nebula_image::Rendered> for ImageData {
-    fn from(r: nebula_image::Rendered) -> Self {
+impl From<bucketforge_image::Rendered> for ImageData {
+    fn from(r: bucketforge_image::Rendered) -> Self {
         let data_url = format!("data:{};base64,{}", r.mime, base64(&r.bytes));
         Self {
             data_url,
@@ -69,7 +69,8 @@ impl App {
             return Ok(hit);
         }
         let bytes = self.fetch_bytes(account, path).await?;
-        let rendered = spawn_render(move || nebula_image::render_view(&bytes, max_edge)).await?;
+        let rendered =
+            spawn_render(move || bucketforge_image::render_view(&bytes, max_edge)).await?;
         let data = ImageData::from(rendered);
         self.cache_put(account, path, &etag, &variant, &data);
         Ok(data)
@@ -88,7 +89,7 @@ impl App {
             return Ok(hit);
         }
         let bytes = self.fetch_bytes(account, path).await?;
-        let rendered = spawn_render(move || nebula_image::render_thumb(&bytes, size)).await?;
+        let rendered = spawn_render(move || bucketforge_image::render_thumb(&bytes, size)).await?;
         let data = ImageData::from(rendered);
         self.cache_put(account, path, &etag, &variant, &data);
         Ok(data)
@@ -105,7 +106,7 @@ impl App {
             return Ok(hit);
         }
         let bytes = self.fetch_bytes(account, path).await?;
-        let info = spawn_blocking_ok(move || nebula_image::read_exif(&bytes)).await?;
+        let info = spawn_blocking_ok(move || bucketforge_image::read_exif(&bytes)).await?;
         self.cache_put(account, path, &etag, "exif", &info);
         Ok(info)
     }
@@ -123,10 +124,11 @@ impl App {
         // 裁剪坐标基于原图像素,须在全分辨率上做;其余操作在缩小底图上预览即可(大图快很多)。
         let rendered = if ops.crop.is_some() {
             let orig = self.original_bytes(account, path, &etag).await?;
-            spawn_render(move || nebula_image::render_edit(&orig, &ops, Some(max_edge))).await?
+            spawn_render(move || bucketforge_image::render_edit(&orig, &ops, Some(max_edge)))
+                .await?
         } else {
             let base = self.edit_base(account, path, &etag, max_edge).await?;
-            spawn_render(move || nebula_image::render_edit(&base, &ops, None)).await?
+            spawn_render(move || bucketforge_image::render_edit(&base, &ops, None)).await?
         };
         Ok(ImageData::from(rendered))
     }
@@ -140,7 +142,8 @@ impl App {
         ops: Ops,
     ) -> Result<ImageData> {
         let orig = self.original_bytes(account, path, &etag).await?;
-        let rendered = spawn_render(move || nebula_image::render_edit(&orig, &ops, None)).await?;
+        let rendered =
+            spawn_render(move || bucketforge_image::render_edit(&orig, &ops, None)).await?;
         Ok(ImageData::from(rendered))
     }
 
@@ -171,7 +174,7 @@ impl App {
     ) -> Result<(Vec<u8>, String)> {
         let orig = self.original_bytes(account, path, &etag).await?;
         tokio::task::spawn_blocking(move || {
-            nebula_image::encode_edit(&orig, &ops, &format, quality)
+            bucketforge_image::encode_edit(&orig, &ops, &format, quality)
         })
         .await
         .map_err(|e| AppError::Image(e.to_string()))?
@@ -225,7 +228,7 @@ impl App {
                 return Ok(bytes);
             }
             let orig = self.original_bytes(account, path, etag).await?;
-            let png = spawn_blocking_ok(move || nebula_image::downscaled_png(&orig, max_edge))
+            let png = spawn_blocking_ok(move || bucketforge_image::downscaled_png(&orig, max_edge))
                 .await?
                 .map_err(|e| AppError::Image(e.to_string()))?;
             if let Some(parent) = file.parent() {
@@ -235,7 +238,7 @@ impl App {
             return Ok(png);
         }
         let orig = self.original_bytes(account, path, etag).await?;
-        spawn_blocking_ok(move || nebula_image::downscaled_png(&orig, max_edge))
+        spawn_blocking_ok(move || bucketforge_image::downscaled_png(&orig, max_edge))
             .await?
             .map_err(|e| AppError::Image(e.to_string()))
     }
@@ -322,9 +325,9 @@ fn digest(account: &str, path: &str, etag: &Option<String>, variant: &str) -> u6
 }
 
 /// 在阻塞线程池上跑图片渲染(解码/缩放是 CPU 密集,别占住 async 线程),并把两层错误摊平。
-async fn spawn_render<F>(f: F) -> Result<nebula_image::Rendered>
+async fn spawn_render<F>(f: F) -> Result<bucketforge_image::Rendered>
 where
-    F: FnOnce() -> std::result::Result<nebula_image::Rendered, nebula_image::ImageError>
+    F: FnOnce() -> std::result::Result<bucketforge_image::Rendered, bucketforge_image::ImageError>
         + Send
         + 'static,
 {

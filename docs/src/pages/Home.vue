@@ -32,7 +32,7 @@
                       class="shimmer px-6 py-3 rounded-xl bg-gradient-to-r from-brand-500 to-violet-600 text-white font-medium shadow-glow hover:shadow-[0_24px_70px_-18px_rgba(99,102,241,.6)] transition-shadow">
             {{ t('hero.download') }}
           </RouterLink>
-          <a href="https://github.com/devlive-community/nebula" target="_blank" rel="noopener"
+          <a href="https://github.com/devlive-community/bucketforge" target="_blank" rel="noopener"
              class="px-6 py-3 rounded-xl border border-white/15 bg-white/5 text-white font-medium backdrop-blur hover:bg-white/10 transition-colors">
             {{ t('hero.github') }}
           </a>

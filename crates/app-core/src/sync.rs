@@ -705,7 +705,7 @@ impl App {
         spec: &SyncSpec,
         resolutions: &BTreeMap<String, ConflictChoice>,
         cancel: &AtomicBool,
-        progress: nebula_provider::ProgressFn<'_>,
+        progress: bucketforge_provider::ProgressFn<'_>,
     ) -> Result<SyncReport> {
         let account = &spec.account;
         let remote_prefix = &spec.remote_prefix;
@@ -731,7 +731,7 @@ impl App {
             .collect();
         let total = actionable.len() as u64;
         let mut report = SyncReport::default();
-        let noop: nebula_provider::ProgressFn = &|_, _| {};
+        let noop: bucketforge_provider::ProgressFn = &|_, _| {};
         // 双向:记录每个动作是否成功,收尾时据此更新 manifest。
         let mut ok_set: std::collections::HashSet<String> = std::collections::HashSet::new();
 
@@ -855,7 +855,7 @@ impl App {
         if let Some(parent) = dest.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let part = dest.with_extension("nebula-part");
+        let part = dest.with_extension("bucketforge-part");
         let (_, mut stream) = self.provider(account)?.read_stream(remote_path).await?;
         let mut file = tokio::fs::File::create(&part).await?;
         while let Some(chunk) = stream.next().await {
@@ -1137,7 +1137,7 @@ mod tests {
         let dir = std::env::temp_dir();
         let existing = dir.to_string_lossy().to_string();
         let missing = dir
-            .join("does-not-exist-nebula-test")
+            .join("does-not-exist-bucketforge-test")
             .to_string_lossy()
             .to_string();
 

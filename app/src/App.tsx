@@ -2315,7 +2315,7 @@ export default function App() {
         ) : (
           <div className="empty-state">
             <Logo size={72} />
-            <h2>欢迎使用 Nebula</h2>
+            <h2>欢迎使用 BucketForge</h2>
             <p>添加一个云账号开始管理你的对象存储</p>
             <button className="btn btn--primary" onClick={() => setShowForm(true)}>
               <FontAwesomeIcon icon={faPlus} /> 添加账号

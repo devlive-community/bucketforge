@@ -36,7 +36,7 @@ const messages = {
       }
     },
     download: {
-      title: '下载 Nebula',
+      title: '下载 BucketForge',
       latestPrefix: '当前最新版本',
       latestSuffix: ',详见',
       releaseNotes: '发布说明',
@@ -74,7 +74,7 @@ const messages = {
       desc: 'Switch cloud accounts on the left, drill into buckets and folders on the right; drag-to-upload, batch download and chunked progress all in one window.'
     },
     features: {
-      tag: 'Why Nebula',
+      tag: 'Why BucketForge',
       title: 'One app for your cloud files',
       items: {
         multicloud: {title: 'Multi-cloud', desc: 'Manage object storage from one UI, down to creating and deleting buckets; buckets in other regions are routed to their own region automatically; bucket-level governance lives in the same UI too — lifecycle rules (auto-expire / auto-tier by prefix and age), versioning (enable / suspend, browse and restore or permanently delete old versions), CORS rules and static website hosting, exposed per each provider\'s real support; add a vendor by implementing a single trait — no UI changes.'},
@@ -90,7 +90,7 @@ const messages = {
       }
     },
     download: {
-      title: 'Download Nebula',
+      title: 'Download BucketForge',
       latestPrefix: 'Latest version',
       latestSuffix: '. See the',
       releaseNotes: 'release notes',

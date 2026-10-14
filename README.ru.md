@@ -1,14 +1,14 @@
 [English](README.md) · [简体中文](README.zh-CN.md) · **Русский** · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-# Nebula
+# BucketForge
 
 **Кроссплатформенный настольный менеджер объектного хранилища для нескольких облаков** — управляйте Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi, DigitalOcean Spaces, Scaleway Object Storage, UCloud US3, JD Cloud OSS и UPYUN из одного нативного приложения, как обычным файловым менеджером: просмотр, загрузка и выгрузка, публикация ссылок и миграция между облаками — всё в одном месте.
 
 Создано на Rust + Tauri — лёгкое, быстрое, нативное на macOS / Windows / Linux. Каждое облако поддержано написанным вручную, независимо публикуемым Rust SDK, без каких-либо агрегирующих библиотек.
 
-> Сайт: <https://nebula.devlive.org/> · Загрузка: [GitHub Releases](https://github.com/devlive-community/nebula/releases)
+> Сайт: <https://bucketforge.devlive.org/> · Загрузка: [GitHub Releases](https://github.com/devlive-community/bucketforge/releases)
 >
-> Репозиторий: [GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
+> Репозиторий: [GitHub](https://github.com/devlive-community/bucketforge) · [GitCode](https://gitcode.com/trendforge/bucketforge)
 
 ## Поддерживаемые облака
 

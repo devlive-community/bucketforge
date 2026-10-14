@@ -36,7 +36,7 @@ export function AboutDialog({ onClose }: Props) {
         <div className="modal__body about">
           <div className="about__brand">
             <Logo size={56} />
-            <div className="about__name">Nebula</div>
+            <div className="about__name">BucketForge</div>
             {version && <div className="about__version">v{version}</div>}
           </div>
 
@@ -47,10 +47,10 @@ export function AboutDialog({ onClose }: Props) {
           </p>
 
           <div className="about__links">
-            <span className="about__link">nebula.devlive.org</span>
+            <span className="about__link">bucketforge.devlive.org</span>
             <span className="about__sep">·</span>
             <span className="about__link">
-              github.com/devlive-community/nebula
+              github.com/devlive-community/bucketforge
             </span>
           </div>
 

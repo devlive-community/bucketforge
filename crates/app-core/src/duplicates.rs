@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use nebula_provider::Entry;
+use bucketforge_provider::Entry;
 use serde::{Deserialize, Serialize};
 
 use crate::{App, Result};

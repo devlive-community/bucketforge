@@ -1,4 +1,4 @@
-# Nebula 桌面应用
+# BucketForge 桌面应用
 
 Tauri 2 + React + TypeScript + 自定义 CSS 的多云存储管理界面。
 
@@ -51,5 +51,5 @@ pnpm tauri build
 
 ## 说明
 
-- 数据目录下的 `nebula.db`(SQLite)存账号元信息与设置;密钥单独存系统钥匙串。
+- 数据目录下的 `bucketforge.db`(SQLite)存账号元信息与设置;密钥单独存系统钥匙串。
 - 目前内置阿里云 OSS 一家;新增厂商只需实现 `StorageProvider` 并在 `app-core` 注册,界面无需改动。

@@ -262,7 +262,7 @@ mod tests {
     use super::*;
     use crate::{MemorySecrets, SecretStore};
     use async_trait::async_trait;
-    use nebula_provider::{Capabilities, Entry, ProviderError, StorageProvider};
+    use bucketforge_provider::{Capabilities, Entry, ProviderError, StorageProvider};
     use std::sync::{Arc, Mutex};
 
     /// 记录分片上传的测试 provider,可让某个分片首次失败以模拟中断。
@@ -293,13 +293,13 @@ mod tests {
                 ..Default::default()
             }
         }
-        async fn list(&self, _path: &str) -> nebula_provider::Result<Vec<Entry>> {
+        async fn list(&self, _path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
             Ok(vec![])
         }
-        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
             Err(ProviderError::NotFound(path.into()))
         }
-        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+        async fn read(&self, _path: &str) -> bucketforge_provider::Result<Bytes> {
             Ok(Bytes::new())
         }
         async fn write(
@@ -307,17 +307,17 @@ mod tests {
             _path: &str,
             _data: Bytes,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             Ok(())
         }
-        async fn delete(&self, _path: &str) -> nebula_provider::Result<()> {
+        async fn delete(&self, _path: &str) -> bucketforge_provider::Result<()> {
             Ok(())
         }
         async fn begin_multipart(
             &self,
             _path: &str,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<String> {
+        ) -> bucketforge_provider::Result<String> {
             Ok("uid".into())
         }
         async fn upload_part(
@@ -326,7 +326,7 @@ mod tests {
             _upload_id: &str,
             part_number: u32,
             data: Bytes,
-        ) -> nebula_provider::Result<String> {
+        ) -> bucketforge_provider::Result<String> {
             let mut fail = self.fail_part_once.lock().unwrap();
             if *fail == Some(part_number) {
                 *fail = None; // 只失败一次
@@ -340,20 +340,20 @@ mod tests {
             _path: &str,
             _upload_id: &str,
             parts: &[(u32, String)],
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             *self.completed.lock().unwrap() = Some(parts.to_vec());
             Ok(())
         }
     }
 
     fn temp_file(name: &str, bytes: &[u8]) -> std::path::PathBuf {
-        let p = std::env::temp_dir().join(format!("nebula-upload-{name}"));
+        let p = std::env::temp_dir().join(format!("bucketforge-upload-{name}"));
         std::fs::write(&p, bytes).unwrap();
         p
     }
 
     fn app_with_store(name: &str, provider: Arc<ResumableRec>) -> (crate::App, std::path::PathBuf) {
-        let db = std::env::temp_dir().join(format!("nebula-updb-{name}.sqlite"));
+        let db = std::env::temp_dir().join(format!("bucketforge-updb-{name}.sqlite"));
         let _ = std::fs::remove_file(&db);
         let secrets: Arc<dyn SecretStore> = Arc::new(MemorySecrets::default());
         let app = crate::App::with_store_and_secrets(&db, secrets).unwrap();

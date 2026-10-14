@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, Entry, ProgressFn, ProviderError, Result, StorageProvider,
 };
 use upyun_uss::{ListEntry, S3Client, S3Error};
@@ -151,10 +151,14 @@ impl StorageProvider for UpyunProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -178,7 +182,7 @@ impl StorageProvider for UpyunProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -295,7 +299,7 @@ impl StorageProvider for UpyunProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

@@ -1,12 +1,12 @@
 ---
 title: 启动 App 连弹 N 次钥匙串密码:一次 macOS Keychain 的排查复盘
 date: 2026-07-10
-author: Nebula Team
+author: BucketForge Team
 description: 用户配了 4 个云账号,一开 App 系统就连着弹 4 次钥匙串授权。这背后其实是两个独立的问题——一个能靠代码根治,另一个是 macOS 把"始终允许"绑在了代码签名上。这是我们的排查与修复复盘。
 tags: ['开发', 'macOS', 'Keychain', '安全']
 ---
 
-Nebula 的一条铁律是:**AccessKeySecret 绝不落 SQLite**。数据库里只存账号的公开信息(endpoint、AccessKeyId、备注),真正的密钥交给操作系统的安全存储——macOS 是 Keychain,Windows 是凭据管理器,Linux 是内核 keyutils。这层抽象叫 `SecretStore`。
+BucketForge 的一条铁律是:**AccessKeySecret 绝不落 SQLite**。数据库里只存账号的公开信息(endpoint、AccessKeyId、备注),真正的密钥交给操作系统的安全存储——macOS 是 Keychain,Windows 是凭据管理器,Linux 是内核 keyutils。这层抽象叫 `SecretStore`。
 
 方向没错,但有用户反馈了一个体验很差的现象:
 
@@ -46,7 +46,7 @@ App 启动时会遍历所有已保存账号,给每个建 provider——每建一
 思路很简单:所有账号的密钥合并成一个 `HashMap<String, String>`,序列化成 JSON,只存进**同一条**钥匙串条目;首次读取后缓存在内存里,整个进程只真正碰一次钥匙串。
 
 ```rust
-const BLOB_KEY: &str = "__nebula_secrets__";
+const BLOB_KEY: &str = "__bucketforge_secrets__";
 
 pub struct KeyringSecrets {
     service: String,

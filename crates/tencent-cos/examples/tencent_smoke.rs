@@ -21,8 +21,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bucket = env::var("COS_BUCKET").expect("需要设置 COS_BUCKET");
 
     let client = CosClient::new(sid, sk, endpoint);
-    let key = "nebula-smoke-test.txt";
-    let content = b"hello from nebula tencent-cos smoke test";
+    let key = "bucketforge-smoke-test.txt";
+    let content = b"hello from bucketforge tencent-cos smoke test";
 
     println!("bucket = {bucket}\n");
 
@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.delete_object(&bucket, key).await?;
     println!("[5/5] delete_object ✅ 已清理临时对象");
 
-    let mp_key = "nebula-smoke-multipart.bin";
+    let mp_key = "bucketforge-smoke-multipart.bin";
     let part_size = tencent_cos::multipart::MIN_PART_SIZE; // 1 MiB
     let big: Vec<u8> = (0..(part_size * 2 + 12345))
         .map(|i| (i % 251) as u8)

@@ -11,16 +11,16 @@
 //! 规则(转换/过期)、版本控制(标准启用/暂停模型)、CORS 配置接口、静态网站托管配置官方文档
 //! 均确认支持;存储类型只有 `STANDARD`/`ONEZONE_IA`/`GLACIER` 三档(比 AWS 少,但和 AWS 同名,
 //! 可以直接复用 `x-amz-storage-class` 语义),`GLACIER` 仅 `fr-par`/`nl-ams` 两个区域可用——
-//! Nebula 拿不到"当前 bucket 所在区域是否支持该存储类型"这层信息,不在客户端做额外校验,
+//! BucketForge 拿不到"当前 bucket 所在区域是否支持该存储类型"这层信息,不在客户端做额外校验,
 //! 交给服务端在真正设置时报错。ACL 模型比 AWS 简化(官方文档只强调 `public-read`/`private`
 //! 两态的"对象可见性"概念,没有 `public-read-write`/`authenticated-read` 等更细粒度的
-//! canned ACL),但协议层接受标准的 `x-amz-acl` 头,和 Nebula 现有"公开读/私有"二态模型天然匹配。
+//! canned ACL),但协议层接受标准的 `x-amz-acl` 头,和 BucketForge 现有"公开读/私有"二态模型天然匹配。
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
     ProgressFn, ProviderError, Result, StorageProvider,
 };
@@ -188,10 +188,14 @@ impl StorageProvider for ScalewayProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -215,7 +219,7 @@ impl StorageProvider for ScalewayProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -332,7 +336,7 @@ impl StorageProvider for ScalewayProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

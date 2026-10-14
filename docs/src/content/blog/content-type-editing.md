@@ -1,7 +1,7 @@
 ---
 title: 详情里的"类型"一直是猜的:读出并修正真实 Content-Type
 date: 2026-07-11
-author: Nebula Team
+author: BucketForge Team
 description: 对象详情里显示的"类型"其实是从文件名猜的,不是对象真实的 Content-Type。这篇讲怎么读出真实值、以及怎么改它——附一个"列举拿不到、HEAD 才有"的小坑。
 tags: ['开发', '对象存储', '元数据', '架构']
 ---

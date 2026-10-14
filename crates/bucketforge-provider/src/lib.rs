@@ -1,6 +1,6 @@
-//! # nebula-provider
+//! # bucketforge-provider
 //!
-//! Nebula App 与各家云之间的**统一抽象层**。App 只依赖本 crate 的
+//! BucketForge App 与各家云之间的**统一抽象层**。App 只依赖本 crate 的
 //! [`StorageProvider`] trait 与数据模型,不直接接触任何厂商 SDK;各厂商由
 //! `providers/provider-*` 适配层实现该 trait。
 //!

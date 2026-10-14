@@ -734,7 +734,7 @@ mod tests {
     #[test]
     fn persists_across_reopen() {
         let path = std::env::temp_dir().join(format!(
-            "nebula-store-test-{}.db",
+            "bucketforge-store-test-{}.db",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()

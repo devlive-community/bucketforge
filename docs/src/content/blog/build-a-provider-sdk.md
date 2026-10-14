@@ -1,14 +1,14 @@
 ---
-title: 手把手:为 Nebula 新增一个云厂商 SDK
+title: 手把手:为 BucketForge 新增一个云厂商 SDK
 date: 2026-07-07
-author: Nebula Team
-description: Nebula 的每家云都是从零手写的独立 Rust SDK。这篇按标准增量顺序,带你把一个新厂商从 crate 骨架写到能在 App 里跑通,并说清每一步怎么验收。
+author: BucketForge Team
+description: BucketForge 的每家云都是从零手写的独立 Rust SDK。这篇按标准增量顺序,带你把一个新厂商从 crate 骨架写到能在 App 里跑通,并说清每一步怎么验收。
 tags: ['开发', 'SDK']
 ---
 
-> 完整规范见仓库里的 [SDK 开发手册](https://github.com/devlive-community/nebula/blob/dev/docs/sdk-playbook.md);本文是它的实操版,配合厂商规格卡一起看。
+> 完整规范见仓库里的 [SDK 开发手册](https://github.com/devlive-community/bucketforge/blob/dev/docs/sdk-playbook.md);本文是它的实操版,配合厂商规格卡一起看。
 
-Nebula 的架构把"厂商差异"关在最底层:
+BucketForge 的架构把"厂商差异"关在最底层:
 
 ```
 cloud-core  →  厂商 SDK  →  provider 适配层  →  app
@@ -18,9 +18,9 @@ cloud-core  →  厂商 SDK  →  provider 适配层  →  app
 
 ## 0. 三条不可违反的红线
 
-1. 厂商 SDK 只依赖 `cloud-core` + reqwest/serde/tokio,**绝不**依赖 `nebula-provider` / `app` 或其它厂商 SDK。
+1. 厂商 SDK 只依赖 `cloud-core` + reqwest/serde/tokio,**绝不**依赖 `bucketforge-provider` / `app` 或其它厂商 SDK。
 2. 依赖方向严格单向:`cloud-core → 厂商 SDK → 适配层 → app`。
-3. SDK 用**厂商原名**(如 `tencent-cos`,不是 `nebula-tencent`),便于被搜索复用。
+3. SDK 用**厂商原名**(如 `tencent-cos`,不是 `bucketforge-tencent`),便于被搜索复用。
 
 ## 1. crate 六件套
 
@@ -85,4 +85,4 @@ cargo test -p <vendor>
 
 ---
 
-照这套走,复刻 `tencent-cos` / `huawei-obs` / `aws-s3` 就是"复制骨架、换 `sign.rs`、换 endpoint"。欢迎来 [GitHub](https://github.com/devlive-community/nebula) 一起补齐更多云。
+照这套走,复刻 `tencent-cos` / `huawei-obs` / `aws-s3` 就是"复制骨架、换 `sign.rs`、换 endpoint"。欢迎来 [GitHub](https://github.com/devlive-community/bucketforge) 一起补齐更多云。

@@ -7,8 +7,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use bucketforge_provider::{ByteStream, ProviderError};
 use futures::StreamExt;
-use nebula_provider::{ByteStream, ProviderError};
 
 /// 给字节流套上取消检查。取消置位后,下一个分块变为错误,终止整条流。
 pub(crate) fn cancellable(stream: ByteStream, cancel: Arc<AtomicBool>) -> ByteStream {

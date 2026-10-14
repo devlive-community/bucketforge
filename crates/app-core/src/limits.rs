@@ -9,9 +9,9 @@
 
 use std::sync::Arc;
 
+use bucketforge_provider::ByteStream;
 use cloud_core::RateLimiter;
 use futures::StreamExt;
-use nebula_provider::ByteStream;
 
 /// 每 KiB 的字节数。设置以 KiB/秒 表达,底层按字节计。
 const KIB: u64 = 1024;

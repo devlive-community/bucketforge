@@ -1,7 +1,7 @@
 ---
 title: 只给两家云做的功能，顺手在第三处代码里挖出一个签名 bug
 date: 2026-08-05
-author: Nebula Team
+author: BucketForge Team
 description: 细粒度对象 ACL——按具体账号 ID 授权,而不是公开/私有二选一——七家云里认真查过文档后只有 AWS S3 和华为云 OBS 值得做。写华为云那份实现时,新方法一上线就报签名不匹配,原因是半年前就留了一句"用到再补"的注释,这次终于用到了却忘了回来补。
 tags: ['开发', '对象存储', '权限']
 ---
@@ -21,7 +21,7 @@ AWS S3 的 `PutObjectAcl`/`GetObjectAcl` 和华为云 OBS 的对应接口,请求
 `xsi:type="CanonicalUser"` 属性区分账号授权和预置分组授权,华为云的 `Grantee` 就只有一个
 `<ID>`,没有这层区分(它的预置分组用完全不同的 `<Canned>Everyone</Canned>` 表示)。这个共性
 让上层的 `Grant`/`Permission` 模型可以完全共享,只有两边各自的 XML 编解码代码不一样——和这个
-仓库里"通用积木放 `nebula-provider`,每家怎么拼 XML 各写各的"这条老规矩完全一致。
+仓库里"通用积木放 `bucketforge-provider`,每家怎么拼 XML 各写各的"这条老规矩完全一致。
 
 ## 一行签名白名单漏掉的注释,终于兑现了
 

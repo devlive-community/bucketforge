@@ -1,13 +1,13 @@
 //! 把 [`qiniu_kodo::KodoClient`] 适配成统一的 [`StorageProvider`]。
 //!
-//! App 私有适配层(不发布):唯一同时依赖 `qiniu-kodo` 和 `nebula-provider` 的地方。
+//! App 私有适配层(不发布):唯一同时依赖 `qiniu-kodo` 和 `bucketforge-provider` 的地方。
 //! 七牛云走 S3 兼容端点,路径遵循 `bucket/key` 约定,与阿里云 / 华为云适配层同构。
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, Entry, IncompleteUpload, ProgressFn, ProviderError, Result,
     StorageProvider,
 };
@@ -143,10 +143,14 @@ impl StorageProvider for QiniuProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -170,7 +174,7 @@ impl StorageProvider for QiniuProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -287,7 +291,7 @@ impl StorageProvider for QiniuProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

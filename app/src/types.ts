@@ -66,31 +66,31 @@ export interface ImageData {
   orig_height: number;
 }
 
-/** PDF 单页概览(与 nebula_pdf::PageInfo 对应)。尺寸为 PDF 用户单位(1/72 英寸)。 */
+/** PDF 单页概览(与 bucketforge_pdf::PageInfo 对应)。尺寸为 PDF 用户单位(1/72 英寸)。 */
 export interface PdfPageInfo {
   width: number;
   height: number;
   rotate: number;
 }
 
-/** PDF 页面概览(与 nebula_pdf::PdfInfo 对应)。 */
+/** PDF 页面概览(与 bucketforge_pdf::PdfInfo 对应)。 */
 export interface PdfInfo {
   pages: PdfPageInfo[];
 }
 
-/** 组装清单里的一页(与 nebula_pdf::PageSpec 对应)。 */
+/** 组装清单里的一页(与 bucketforge_pdf::PageSpec 对应)。 */
 export interface PdfPageSpec {
   doc: number;
   page: number;
   rotate: number;
 }
 
-/** PDF 组装清单(与 nebula_pdf::Assembly 对应)。 */
+/** PDF 组装清单(与 bucketforge_pdf::Assembly 对应)。 */
 export interface PdfAssembly {
   pages: PdfPageSpec[];
 }
 
-/** 页码位置(与 nebula_pdf::NumberPos 对应,snake_case)。 */
+/** 页码位置(与 bucketforge_pdf::NumberPos 对应,snake_case)。 */
 export type PdfNumberPos =
   | "top_left"
   | "top_center"
@@ -99,7 +99,7 @@ export type PdfNumberPos =
   | "bottom_center"
   | "bottom_right";
 
-/** 加页码参数(与 nebula_pdf::PageNumbers 对应)。 */
+/** 加页码参数(与 bucketforge_pdf::PageNumbers 对应)。 */
 export interface PdfPageNumbers {
   start: number;
   position: PdfNumberPos;
@@ -108,7 +108,7 @@ export interface PdfPageNumbers {
   format: string;
 }
 
-/** 文字水印参数(与 nebula_pdf::Watermark 对应)。 */
+/** 文字水印参数(与 bucketforge_pdf::Watermark 对应)。 */
 export interface PdfWatermark {
   text: string;
   size: number;
@@ -118,7 +118,7 @@ export interface PdfWatermark {
   tile: boolean;
 }
 
-/** 同步模式(与 nebula sync::SyncMode 对应,snake_case)。 */
+/** 同步模式(与 bucketforge sync::SyncMode 对应,snake_case)。 */
 export type SyncMode = "mirror_up" | "mirror_down" | "two_way";
 
 /** 单个文件的同步动作(与 sync::SyncAction 对应)。 */
@@ -223,7 +223,7 @@ export interface ImageOps {
   badges?: { x: number; y: number; n: number; color: [number, number, number]; size: number }[];
 }
 
-/** EXIF 摘要(字段全部可选),与 nebula_image::ExifInfo 对应。 */
+/** EXIF 摘要(字段全部可选),与 bucketforge_image::ExifInfo 对应。 */
 export interface ExifInfo {
   make?: string | null;
   model?: string | null;
@@ -305,7 +305,7 @@ export interface TextPreview {
   truncated: boolean;
 }
 
-/** 未完成(残留)的分片上传(与 Rust 端 nebula_provider::IncompleteUpload 对应)。 */
+/** 未完成(残留)的分片上传(与 Rust 端 bucketforge_provider::IncompleteUpload 对应)。 */
 export interface IncompleteUpload {
   key: string;
   upload_id: string;
@@ -313,7 +313,7 @@ export interface IncompleteUpload {
   initiated: string;
 }
 
-/** 分页列举的一页(与 Rust 端 nebula_provider::Page 对应)。 */
+/** 分页列举的一页(与 Rust 端 bucketforge_provider::Page 对应)。 */
 export interface Page {
   entries: Entry[];
   /** 下一页游标;null 表示已到末页。 */
@@ -438,7 +438,7 @@ export interface LargestFiles {
   total_count: number;
 }
 
-/** 与 Rust 端 nebula_provider::Entry 对应。 */
+/** 与 Rust 端 bucketforge_provider::Entry 对应。 */
 export interface Entry {
   name: string;
   path: string;

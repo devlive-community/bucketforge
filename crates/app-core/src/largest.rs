@@ -1,6 +1,6 @@
 //! 大文件排行:列出一个文件夹下最占空间的 Top N 对象,帮你一眼看到该清理谁(成本治理)。
 
-use nebula_provider::Entry;
+use bucketforge_provider::Entry;
 use serde::{Deserialize, Serialize};
 
 use crate::{App, Result};

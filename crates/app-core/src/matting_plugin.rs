@@ -145,7 +145,7 @@ impl App {
             .matting_dylib_path()
             .filter(|p| p.exists())
             .ok_or_else(|| AppError::InvalidInput("matting plugin not installed".into()))?;
-        nebula_matting::init(&dylib).map_err(|e| AppError::Image(e.to_string()))
+        bucketforge_matting::init(&dylib).map_err(|e| AppError::Image(e.to_string()))
     }
 
     /// 安装插件:下载模型 + 运行时库(解压提取库),`progress(done, total)` 报总进度。
@@ -221,7 +221,7 @@ impl App {
             img.len()
         ));
         let out = tokio::task::spawn_blocking(move || {
-            nebula_matting::remove_background(&model_bytes, &img)
+            bucketforge_matting::remove_background(&model_bytes, &img)
         })
         .await
         .map_err(|e| AppError::Image(e.to_string()))?

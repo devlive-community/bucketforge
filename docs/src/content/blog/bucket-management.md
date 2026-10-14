@@ -1,18 +1,18 @@
 ---
 title: 能浏览 Bucket 却不能新建?一个藏在抽象层里的能力
 date: 2026-07-11
-author: Nebula Team
+author: BucketForge Team
 description: 补上新建 / 删除 Bucket——但有意思的是,这个功能几乎不用写代码:各家 SDK 早就实现好了,只是没从统一 trait 暴露出来。聊聊分层抽象怎么"藏"住能力。
 tags: ['开发', '对象存储', 'Bucket', '架构']
 ---
 
-Nebula 一直能在根层级浏览你的所有 Bucket,但有个尴尬:**你没法新建一个 Bucket**,也删不掉空桶。想开个新桶,还得跑去各家云的控制台。这次补上——右键 Bucket 删除、根层级「新建 Bucket」按钮。
+BucketForge 一直能在根层级浏览你的所有 Bucket,但有个尴尬:**你没法新建一个 Bucket**,也删不掉空桶。想开个新桶,还得跑去各家云的控制台。这次补上——右键 Bucket 删除、根层级「新建 Bucket」按钮。
 
 但实现这个功能的过程,反而暴露了分层抽象的一个有意思的现象:**能力其实早就有了,只是被藏在了抽象层下面。**
 
 ## 打开一看,SDK 早写好了
 
-Nebula 的存储访问分三层:各家云的原生 SDK(`s3-core` / `aliyun-oss` / …)→ 统一的 `StorageProvider` trait → App 层。加功能一般要从底层一路往上写。
+BucketForge 的存储访问分三层:各家云的原生 SDK(`s3-core` / `aliyun-oss` / …)→ 统一的 `StorageProvider` trait → App 层。加功能一般要从底层一路往上写。
 
 可当我准备实现 `create_bucket` 时,翻开各家 SDK 一看——`create_bucket` 和 `delete_bucket` **全都已经写好了**:
 

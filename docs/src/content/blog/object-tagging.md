@@ -1,12 +1,12 @@
 ---
 title: 给对象贴标签:一个子资源,四套签名,一份 XML
 date: 2026-07-13
-author: Nebula Team
+author: BucketForge Team
 description: 对象标签是驱动生命周期、权限、成本分摊的元数据基石。这篇讲怎么把 GetObjectTagging / PutObjectTagging 接进七家云——关键在于它和归档取回共用同一套"子资源签名"机制。
 tags: ['开发', '对象存储', '元数据', '架构']
 ---
 
-对象标签(Object Tagging)是给对象挂一组 key-value,比如 `env=prod`、`team=data`。它不像 Content-Type 那样影响内容,却是很多云端能力的**基石**:生命周期规则按标签自动转档 / 过期、访问策略按标签授权、账单按标签分摊。这次给 Nebula 补上标签的读写。
+对象标签(Object Tagging)是给对象挂一组 key-value,比如 `env=prod`、`team=data`。它不像 Content-Type 那样影响内容,却是很多云端能力的**基石**:生命周期规则按标签自动转档 / 过期、访问策略按标签授权、账单按标签分摊。这次给 BucketForge 补上标签的读写。
 
 用起来是详情抽屉里一个「标签」按钮,弹出一个键值编辑器:加载现有标签、增删行、整套保存(存空即清空)。
 
@@ -14,7 +14,7 @@ tags: ['开发', '对象存储', '元数据', '架构']
 
 对象存储把「对某个对象的某种附属操作」表达成 URL 上的一个**子资源(sub-resource)**——`?restore`、`?uploads`、`?tagging` 都是。它们的共同点是:**这个 query 参数必须参与签名**,否则请求被拒。
 
-Nebula 之前做归档取回(`?restore`)时,已经为三家自有签名 SDK(OSS / OBS / COS)铺好了「子资源签名」的路:
+BucketForge 之前做归档取回(`?restore`)时,已经为三家自有签名 SDK(OSS / OBS / COS)铺好了「子资源签名」的路:
 
 ```rust
 // 归档取回:POST /{key}?restore,restore 计入签名的 CanonicalizedResource

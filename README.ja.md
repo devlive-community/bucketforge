@@ -1,14 +1,14 @@
 [English](README.md) · [简体中文](README.zh-CN.md) · [Русский](README.ru.md) · **日本語** · [한국어](README.ko.md)
 
-# Nebula
+# BucketForge
 
 **マルチクラウドのオブジェクトストレージを管理するクロスプラットフォームのデスクトップアプリ** —— Aliyun OSS、Tencent COS、Huawei OBS、AWS S3、Cloudflare R2、Qiniu Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage、UCloud US3、JD Cloud OSS、UPYUN を、ローカルのファイルマネージャーのように 1 つのネイティブアプリから管理:閲覧、アップロード / ダウンロード、共有、クラウド間の移行まで一括で。
 
 Rust + Tauri 製 —— 軽量・高速で、macOS / Windows / Linux でネイティブ動作。各クラウドは、集約ライブラリに依存しない手書きの独立公開可能な Rust SDK で実装されています。
 
-> 公式サイト:<https://nebula.devlive.org/> · ダウンロード:[GitHub Releases](https://github.com/devlive-community/nebula/releases)
+> 公式サイト:<https://bucketforge.devlive.org/> · ダウンロード:[GitHub Releases](https://github.com/devlive-community/bucketforge/releases)
 >
-> リポジトリ:[GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
+> リポジトリ:[GitHub](https://github.com/devlive-community/bucketforge) · [GitCode](https://gitcode.com/trendforge/bucketforge)
 
 ## 対応クラウド
 

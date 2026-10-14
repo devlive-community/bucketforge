@@ -2,8 +2,8 @@
   <header class="sticky top-0 z-40 border-b border-slate-200/70 dark:border-white/10 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl">
     <nav class="max-w-6xl mx-auto px-5 h-16 flex items-center gap-8">
       <RouterLink to="/" class="flex items-center gap-2.5 font-semibold text-slate-900 dark:text-white tracking-tight">
-        <img src="/logo.svg" alt="Nebula" class="w-7 h-7"/>
-        <span>Nebula</span>
+        <img src="/logo.svg" alt="BucketForge" class="w-7 h-7"/>
+        <span>BucketForge</span>
       </RouterLink>
 
       <div class="hidden sm:flex items-center gap-1 text-[15px]">
@@ -25,7 +25,7 @@
       </div>
 
       <div class="ml-auto flex items-center gap-1">
-        <a href="https://github.com/devlive-community/nebula" target="_blank" rel="noopener"
+        <a href="https://github.com/devlive-community/bucketforge" target="_blank" rel="noopener"
            class="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"
            aria-label="GitHub">
           <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor">

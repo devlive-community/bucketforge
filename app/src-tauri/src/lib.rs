@@ -1,4 +1,4 @@
-//! Nebula 桌面应用后端:把 [`app_core::App`] 的方法包成 Tauri command。
+//! BucketForge 桌面应用后端:把 [`app_core::App`] 的方法包成 Tauri command。
 //!
 //! 业务逻辑都在 `app-core`(可 `cargo test`),这里只做 JS ↔ Rust 的桥接与本地文件读写。
 
@@ -15,8 +15,8 @@ use app_core::{
     RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
     SyncSpec, TextPreview, TransferRecord, Watermark, WebsiteConfig,
 };
+use bucketforge_provider::Entry;
 use bytes::Bytes;
-use nebula_provider::Entry;
 use serde::Serialize;
 use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -2084,9 +2084,9 @@ fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
     let check_update = MenuItemBuilder::with_id("check-update", "检查更新…").build(app)?;
 
     // 自定义"关于"项(点击弹出 App 自绘的关于弹窗,替代系统默认关于面板)。
-    let about = MenuItemBuilder::with_id("about", "关于 Nebula").build(app)?;
+    let about = MenuItemBuilder::with_id("about", "关于 BucketForge").build(app)?;
 
-    let app_menu = SubmenuBuilder::new(app, "Nebula")
+    let app_menu = SubmenuBuilder::new(app, "BucketForge")
         .item(&about)
         .item(&check_update)
         .separator()
@@ -2122,7 +2122,7 @@ fn setup_menu(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// 启动 Tauri 应用。账号存到应用数据目录下的 `nebula.db`。
+/// 启动 Tauri 应用。账号存到应用数据目录下的 `bucketforge.db`(旧版 `nebula.db` 首次启动自动迁移)。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -2133,10 +2133,17 @@ pub fn run() {
             setup_menu(app.handle())?;
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
-            let core = App::with_store(dir.join("nebula.db"))?;
+            // 更名迁移:旧版(Nebula)数据目录与新目录同级,首次启动复制旧库与插件过来。
+            if let Some(parent) = dir.parent() {
+                let legacy = parent.join(app_core::LEGACY_IDENTIFIER);
+                if let Err(e) = app_core::migrate_legacy_data_dir(&legacy, &dir) {
+                    eprintln!("migrate legacy data failed: {e}");
+                }
+            }
+            let core = App::with_store(dir.join(app_core::DB_FILE))?;
             // 图片渲染缓存放缓存目录(可被系统清理,不占用户数据目录)。
             if let Ok(cache) = app.path().app_cache_dir() {
-                core.set_cache_dir(cache.join("nebula"));
+                core.set_cache_dir(cache.join("bucketforge"));
             }
             // 插件(AI 抠图的模型 + 运行时库)放数据目录,持久保存。
             // 运行时库只在实际用到「去背景」时才懒加载,避免不兼容的库让应用起不来。

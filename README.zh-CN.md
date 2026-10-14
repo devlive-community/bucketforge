@@ -1,19 +1,19 @@
 [English](README.md) · **简体中文** · [Русский](README.ru.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-[![GitHub stars](https://img.shields.io/github/stars/devlive-community/nebula?style=flat&logo=github)](https://github.com/devlive-community/nebula)
-[![Release](https://img.shields.io/github/v/release/devlive-community/nebula?display_name=tag)](https://github.com/devlive-community/nebula/releases)
-[![License](https://img.shields.io/github/license/devlive-community/nebula)](./LICENSE)
-[![GitCode](https://img.shields.io/badge/GitCode-mirror-blue)](https://gitcode.com/trendforge/nebula)
+[![GitHub stars](https://img.shields.io/github/stars/devlive-community/bucketforge?style=flat&logo=github)](https://github.com/devlive-community/bucketforge)
+[![Release](https://img.shields.io/github/v/release/devlive-community/bucketforge?display_name=tag)](https://github.com/devlive-community/bucketforge/releases)
+[![License](https://img.shields.io/github/license/devlive-community/bucketforge)](./LICENSE)
+[![GitCode](https://img.shields.io/badge/GitCode-mirror-blue)](https://gitcode.com/trendforge/bucketforge)
 
-# Nebula
+# BucketForge
 
 **跨平台桌面端的多云对象存储管理器** —— 在一个原生应用里,像用本地文件管理器一样管理阿里云 OSS、腾讯云 COS、华为云 OBS、AWS S3、Cloudflare R2、七牛云 Kodo、MinIO、Backblaze B2、Wasabi、DigitalOcean Spaces、Scaleway Object Storage、UCloud US3、京东云 OSS、又拍云:浏览、上传下载、分享、跨云迁移,一站搞定。
 
 用 Rust + Tauri 打造,轻量、快速、原生三端(macOS / Windows / Linux)。底层每家云都是从零手写的**独立可发布 Rust SDK**,不依赖任何聚合库。
 
-> 官网:<https://nebula.devlive.org/> · 下载:[GitHub Releases](https://github.com/devlive-community/nebula/releases)
+> 官网:<https://bucketforge.devlive.org/> · 下载:[GitHub Releases](https://github.com/devlive-community/bucketforge/releases)
 >
-> 代码仓库:[GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
+> 代码仓库:[GitHub](https://github.com/devlive-community/bucketforge) · [GitCode](https://gitcode.com/trendforge/bucketforge)
 
 ## 支持的云
 
@@ -63,7 +63,7 @@ cloud-core → 各厂商 SDK → providers 适配层 → app
 ```
 
 ```
-nebula/
+bucketforge/
 ├─ crates/
 │  ├─ cloud-core/               公共底座(HTTP / 签名积木 / 错误 / 重试 / 分页)
 │  ├─ s3-sigv4/                 可复用的 AWS SigV4 签名器(S3 系通用)
@@ -82,7 +82,7 @@ nebula/
 │  ├─ ucloud-us3/               UCloud US3 SDK(S3 兼容仅 SigV4,专用构造函数推导 region)
 │  ├─ jdcloud-oss/              京东云 OSS SDK(S3 兼容,s3-core 门面)
 │  ├─ upyun-uss/                又拍云 SDK(S3 兼容,region 硬编码为未经证实的推断值)
-│  ├─ nebula-provider/          App 统一抽象 trait(StorageProvider)
+│  ├─ bucketforge-provider/          App 统一抽象 trait(StorageProvider)
 │  ├─ providers/provider-*      适配层(各 SDK → StorageProvider)
 │  └─ app-core/                 App 业务逻辑(账号/传输/设置,框架无关,可 cargo test)
 └─ app/                         Tauri 桌面应用(src-tauri 后端 + src 前端)
@@ -95,7 +95,7 @@ nebula/
 
 ## 开发约定
 
-- 每家 SDK 保持厂商原名(`aliyun-oss` 而非 `nebula-aliyun`),便于被搜索复用。
+- 每家 SDK 保持厂商原名(`aliyun-oss` 而非 `bucketforge-aliyun`),便于被搜索复用。
 - 厂商 SDK **不得**依赖 App 层任何 crate,以保持独立可发布。
 - 按功能逐个开发:每个功能验证通过后独立提交,确认后再进入下一个。
 

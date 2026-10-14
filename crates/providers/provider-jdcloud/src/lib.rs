@@ -10,7 +10,7 @@
 //!
 //! 能力矩阵对照京东云官方产品功能文档逐项核实:生命周期管理、跨域访问设置(CORS)、静态网站
 //! 托管、对象标签、存储类型转换、分片拷贝均有独立的官方文档页面,标支持;对象 ACL 官方
-//! 三态(private/public-read/public-read-write)确认支持,是 Nebula 现有二态实现的超集
+//! 三态(private/public-read/public-read-write)确认支持,是 BucketForge 现有二态实现的超集
 //! ("PutBucket 不支持 x-amz-acl 头"这条限制针对的是**建桶时**指定 ACL,和这里用的
 //! `PutObjectAcl`(`?acl` 子资源,对象级)是不同的接口,不受影响)。**版本控制没有查到独立
 //! 的官方文档页面确认**(产品功能列表里"跨区域复制"通常隐含依赖版本控制,但这是推断不是
@@ -21,11 +21,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use jdcloud_oss::{ListEntry, S3Client, S3Error};
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule, ProgressFn,
     ProviderError, Result, StorageProvider, WebsiteConfig,
 };
+use jdcloud_oss::{ListEntry, S3Client, S3Error};
 
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
 const MULTIPART_PART_SIZE: usize = 8 * 1024 * 1024;
@@ -162,7 +162,7 @@ impl StorageProvider for JdCloudProvider {
             // 官方产品功能文档有独立的"对象标签"页面。
             object_tagging: true,
             multipart_cleanup: true,
-            // 官方文档确认三态(private/public-read/public-read-write),是 Nebula 现有
+            // 官方文档确认三态(private/public-read/public-read-write),是 BucketForge 现有
             // set_object_acl(path, public: bool) 二态实现的超集。"PutBucket 不支持
             // x-amz-acl"的限制只影响建桶时指定 ACL,不影响这里用的 PutObjectAcl。
             object_acl: true,
@@ -220,10 +220,14 @@ impl StorageProvider for JdCloudProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -247,7 +251,7 @@ impl StorageProvider for JdCloudProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -364,7 +368,7 @@ impl StorageProvider for JdCloudProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

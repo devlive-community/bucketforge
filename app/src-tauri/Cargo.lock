@@ -108,15 +108,15 @@ checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 name = "app-core"
 version = "1.14.0"
 dependencies = [
+ "bucketforge-image",
+ "bucketforge-matting",
+ "bucketforge-pdf",
+ "bucketforge-provider",
  "bytes",
  "cloud-core",
  "flate2",
  "futures",
  "keyring",
- "nebula-image",
- "nebula-matting",
- "nebula-pdf",
- "nebula-provider",
  "provider-aliyun",
  "provider-aws",
  "provider-b2",
@@ -422,6 +422,65 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf88ba1141d185c399bee5288d850d63b8369520c1eafc32a0430b5b6c287bf4"
 dependencies = [
  "tinyvec",
+]
+
+[[package]]
+name = "bucketforge-app"
+version = "1.14.0"
+dependencies = [
+ "app-core",
+ "bucketforge-provider",
+ "bytes",
+ "futures",
+ "notify",
+ "notify-debouncer-full",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tokio",
+]
+
+[[package]]
+name = "bucketforge-image"
+version = "1.14.0"
+dependencies = [
+ "image",
+ "kamadak-exif",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "bucketforge-matting"
+version = "1.14.0"
+dependencies = [
+ "image",
+ "ort",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "bucketforge-pdf"
+version = "1.14.0"
+dependencies = [
+ "lopdf",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "bucketforge-provider"
+version = "1.14.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures",
+ "serde",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2893,65 +2952,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nebula-app"
-version = "1.14.0"
-dependencies = [
- "app-core",
- "bytes",
- "futures",
- "nebula-provider",
- "notify",
- "notify-debouncer-full",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tokio",
-]
-
-[[package]]
-name = "nebula-image"
-version = "1.14.0"
-dependencies = [
- "image",
- "kamadak-exif",
- "serde",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "nebula-matting"
-version = "1.14.0"
-dependencies = [
- "image",
- "ort",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "nebula-pdf"
-version = "1.14.0"
-dependencies = [
- "lopdf",
- "serde",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "nebula-provider"
-version = "1.14.0"
-dependencies = [
- "async-trait",
- "bytes",
- "futures",
- "serde",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3666,9 +3666,9 @@ version = "1.14.0"
 dependencies = [
  "aliyun-oss",
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3677,9 +3677,9 @@ version = "1.14.0"
 dependencies = [
  "async-trait",
  "aws-s3",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3688,9 +3688,9 @@ version = "1.14.0"
 dependencies = [
  "async-trait",
  "backblaze-b2",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3698,10 +3698,10 @@ name = "provider-do-spaces"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "digitalocean-spaces",
  "futures",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3709,10 +3709,10 @@ name = "provider-huawei"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
  "huawei-obs",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3720,10 +3720,10 @@ name = "provider-jdcloud"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
  "jdcloud-oss",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3731,10 +3731,10 @@ name = "provider-minio"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
  "minio-s3",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3742,9 +3742,9 @@ name = "provider-qiniu"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
  "qiniu-kodo",
 ]
 
@@ -3753,10 +3753,10 @@ name = "provider-r2"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "cloudflare-r2",
  "futures",
- "nebula-provider",
 ]
 
 [[package]]
@@ -3764,9 +3764,9 @@ name = "provider-scaleway"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
  "scaleway-object-storage",
 ]
 
@@ -3775,9 +3775,9 @@ name = "provider-tencent"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
  "tencent-cos",
 ]
 
@@ -3786,9 +3786,9 @@ name = "provider-upyun"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
  "upyun-uss",
 ]
 
@@ -3797,9 +3797,9 @@ name = "provider-us3"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
  "ucloud-us3",
 ]
 
@@ -3808,9 +3808,9 @@ name = "provider-wasabi"
 version = "1.14.0"
 dependencies = [
  "async-trait",
+ "bucketforge-provider",
  "bytes",
  "futures",
- "nebula-provider",
  "wasabi-s3",
 ]
 

@@ -1,12 +1,12 @@
 ---
 title: 打开就白屏半秒:启动页要在 JS 跑起来之前就画出来
 date: 2026-07-25
-author: Nebula Team
+author: BucketForge Team
 description: 桌面应用打开的第一帧是空的——webview 要等 HTML 解析、JS 下载执行、React 挂载才有画面。这篇讲怎么用一段内联 HTML/CSS 在 JS 跑之前就画出品牌启动页,再在首帧渲染后淡出。
 tags: ['开发', '前端', '跨平台']
 ---
 
-Nebula 打开的一瞬间,窗口曾经是**纯白**的一小段时间——Tauri 的 webview 要先解析 `index.html`、再下载执行 JS bundle、再等 React 挂载出 `#root`,这中间有一段实打实的空白。窗口越晚出现内容,应用看起来就越"卡"。
+BucketForge 打开的一瞬间,窗口曾经是**纯白**的一小段时间——Tauri 的 webview 要先解析 `index.html`、再下载执行 JS bundle、再等 React 挂载出 `#root`,这中间有一段实打实的空白。窗口越晚出现内容,应用看起来就越"卡"。
 
 ## 关键:启动页不能等 JS
 
@@ -15,8 +15,8 @@ Nebula 打开的一瞬间,窗口曾经是**纯白**的一小段时间——Tauri
 ```html
 <body>
   <div id="splash">
-    <img src="/logo.svg" alt="Nebula" width="88" height="88" />
-    <div id="splash-name">Nebula</div>
+    <img src="/logo.svg" alt="BucketForge" width="88" height="88" />
+    <div id="splash-name">BucketForge</div>
     <div id="splash-bar"><span></span></div>
   </div>
   <div id="root"></div>

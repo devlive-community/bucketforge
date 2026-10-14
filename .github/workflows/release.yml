@@ -78,9 +78,9 @@ jobs:
             body="桌面多云存储管理器。各平台安装包见下方 Assets。"
           fi
           {
-            echo "body<<NEBULA_NOTES_EOF"
+            echo "body<<BUCKETFORGE_NOTES_EOF"
             echo "$body"
-            echo "NEBULA_NOTES_EOF"
+            echo "BUCKETFORGE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
       - name: Build and release

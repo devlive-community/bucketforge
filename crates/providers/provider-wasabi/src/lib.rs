@@ -7,7 +7,7 @@
 //! 能力矩阵已对照 Wasabi 官方文档逐项核实,和同为 S3 兼容的 B2/R2/MinIO **都不一样**:
 //! 对象标签、对象级 ACL(canned)、版本控制(标准启用/暂停模型)官方文档确认支持;CORS 官方
 //! 文档明确写不支持 `PUT`/`GET ?cors` 这套配置接口(Wasabi 是请求带 `Origin` 头时服务端自动
-//! 回 CORS 响应头,不需要也不能显式配置规则,和 Nebula 现有"读写一份规则列表"的 CORS 面板模型
+//! 回 CORS 响应头,不需要也不能显式配置规则,和 BucketForge 现有"读写一份规则列表"的 CORS 面板模型
 //! 没有对应物);静态网站托管官方明确不支持(不打算做,定位是存文件不是托管网站);存储类型
 //! 转换不支持,因为 Wasabi 只有一种存储类型,没有可转换的目标。
 
@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
     ProgressFn, ProviderError, Result, StorageProvider,
 };
@@ -130,7 +130,7 @@ impl StorageProvider for WasabiProvider {
             object_tagging: true,
             multipart_cleanup: true,
             // 协议层支持 canned ACL;公开访问的实际效果可能被 Wasabi 账号等级(免费/试用 vs
-            // 付费)限制,Nebula 拿不到账号等级信息,没法提前判断——已知限制,不是漏做。
+            // 付费)限制,BucketForge 拿不到账号等级信息,没法提前判断——已知限制,不是漏做。
             object_acl: true,
             // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
             fine_grained_acl: false,
@@ -139,10 +139,10 @@ impl StorageProvider for WasabiProvider {
             hierarchical: false,
             // 官方文档确认支持生命周期策略(过期/转换/清理)。
             bucket_lifecycle: true,
-            // 官方文档确认标准启用/暂停模型,和 Nebula 现有语义匹配(不像 B2 那样没有开关)。
+            // 官方文档确认标准启用/暂停模型,和 BucketForge 现有语义匹配(不像 B2 那样没有开关)。
             versioning: true,
             // 官方文档明确不支持 PUT/GET ?cors 这套配置接口——Wasabi 用的是"请求带 Origin
-            // 头就自动回 CORS 响应头"的免配置机制,和 Nebula 的"读写规则列表"面板没有对应物。
+            // 头就自动回 CORS 响应头"的免配置机制,和 BucketForge 的"读写规则列表"面板没有对应物。
             bucket_cors: false,
             // 官方明确表态不支持指定默认首页/错误页,没有计划支持。
             bucket_website: false,
@@ -186,10 +186,14 @@ impl StorageProvider for WasabiProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -213,7 +217,7 @@ impl StorageProvider for WasabiProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -330,7 +334,7 @@ impl StorageProvider for WasabiProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

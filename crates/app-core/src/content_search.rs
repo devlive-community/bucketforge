@@ -1,9 +1,9 @@
 //! 文件**内容**搜索:在文本类文件与 PDF 里查关键字(不同于按文件名搜)。
 //!
 //! 需要下载并解析对象,代价高,故有硬上限:只扫文本类 / PDF 扩展名、跳过过大的文件、
-//! 限制命中数与扫描数。PDF 文本复用 [`nebula_pdf::extract_text`],文本按 UTF-8 有损解码。
+//! 限制命中数与扫描数。PDF 文本复用 [`bucketforge_pdf::extract_text`],文本按 UTF-8 有损解码。
 
-use nebula_provider::Entry;
+use bucketforge_provider::Entry;
 use serde::{Deserialize, Serialize};
 
 use crate::{App, AppError, Result};
@@ -176,7 +176,7 @@ impl App {
             };
             scanned += 1;
             let text = if ext_of(&entry.name) == "pdf" {
-                tokio::task::spawn_blocking(move || nebula_pdf::extract_text(&bytes))
+                tokio::task::spawn_blocking(move || bucketforge_pdf::extract_text(&bytes))
                     .await
                     .map_err(|e| AppError::Image(e.to_string()))?
                     .map(|pages| pages.join("\n"))

@@ -1,7 +1,7 @@
 [package]
 name = "provider-us3"
 version.workspace = true
-description = "Adapter wrapping ucloud-us3 as a nebula StorageProvider (app-internal, not published)"
+description = "Adapter wrapping ucloud-us3 as a bucketforge StorageProvider (app-internal, not published)"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,7 +9,7 @@ authors.workspace = true
 publish = false
 
 [dependencies]
-nebula-provider = { path = "../../nebula-provider" }
+bucketforge-provider = { path = "../../bucketforge-provider" }
 ucloud-us3 = { path = "../../ucloud-us3" }
 async-trait = "0.1"
 bytes = { workspace = true }

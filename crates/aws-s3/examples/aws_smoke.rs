@@ -21,8 +21,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bucket = env::var("AWS_BUCKET").expect("需要设置 AWS_BUCKET");
 
     let client = S3Client::new(ak, sk, endpoint);
-    let key = "nebula-smoke-test.txt";
-    let content = b"hello from nebula aws-s3 smoke test";
+    let key = "bucketforge-smoke-test.txt";
+    let content = b"hello from bucketforge aws-s3 smoke test";
 
     println!("bucket = {bucket}, region = {}\n", client.region());
 
@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.delete_object(&bucket, key).await?;
     println!("[5/5] delete_object ✅ 已清理临时对象");
 
-    let mp_key = "nebula-smoke-multipart.bin";
+    let mp_key = "bucketforge-smoke-multipart.bin";
     let part_size = aws_s3::MIN_PART_SIZE; // 5 MiB
     let big: Vec<u8> = (0..(part_size * 2 + 12345))
         .map(|i| (i % 251) as u8)

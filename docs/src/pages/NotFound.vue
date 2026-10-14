@@ -42,7 +42,7 @@
           <RouterLink to="/download" class="text-brand-600 dark:text-brand-400 hover:underline">{{ t('nav.download') }}</RouterLink>
           <RouterLink to="/blog" class="text-brand-600 dark:text-brand-400 hover:underline">{{ t('nav.blog') }}</RouterLink>
           <RouterLink to="/release" class="text-brand-600 dark:text-brand-400 hover:underline">{{ t('nav.releases') }}</RouterLink>
-          <a href="https://github.com/devlive-community/nebula" target="_blank" rel="noopener" class="text-brand-600 dark:text-brand-400 hover:underline">GitHub</a>
+          <a href="https://github.com/devlive-community/bucketforge" target="_blank" rel="noopener" class="text-brand-600 dark:text-brand-400 hover:underline">GitHub</a>
         </div>
       </div>
     </div>

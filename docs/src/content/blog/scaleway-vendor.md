@@ -1,15 +1,15 @@
 ---
 title: 第四家 S3 兼容云，终于遇到一个"全都支持"的
 date: 2026-08-04
-author: Nebula Team
-description: Backblaze B2、Wasabi、DigitalOcean Spaces 三家 S3 兼容云，每家都在能力矩阵上缺点什么——标签、ACL、CORS、网站托管、存储类型转换，总有那么几项不支持或有额外限制。这次的 Scaleway Object Storage 是个例外：官方文档逐项查下来，Nebula 需要的能力它全都支持。
+author: BucketForge Team
+description: Backblaze B2、Wasabi、DigitalOcean Spaces 三家 S3 兼容云，每家都在能力矩阵上缺点什么——标签、ACL、CORS、网站托管、存储类型转换，总有那么几项不支持或有额外限制。这次的 Scaleway Object Storage 是个例外：官方文档逐项查下来，BucketForge 需要的能力它全都支持。
 tags: ['开发', '对象存储', '架构']
 ---
 
 前三轮 S3 兼容云接下来,能力矩阵调研的规律几乎是"总有缺口":B2 不支持标签、ACL、CORS、网站托管;
 Wasabi 不支持 CORS 配置接口和网站托管;DigitalOcean Spaces 的存储类型转换这条路直接走不通。这次
 接入 **Scaleway Object Storage**(法国云厂商,`fr-par`/`nl-ams`/`pl-waw`/`it-mil` 四个欧洲区域),
-逐项核对官方文档后发现:标签、生命周期规则、版本控制、CORS、静态网站托管、存储类型转换——Nebula
+逐项核对官方文档后发现:标签、生命周期规则、版本控制、CORS、静态网站托管、存储类型转换——BucketForge
 现有能力位覆盖的这几项,它**全部支持**。四家 S3 兼容云接下来,终于遇到一个不用在文档里写"官方明确
 不支持"的。
 
@@ -38,14 +38,14 @@ fn parse_region(endpoint: &str) -> String {
 Scaleway 支持 `STANDARD`、`ONEZONE_IA`、`GLACIER` 三档存储类型,命名直接照抄 AWS 的
 `x-amz-storage-class` 语义,`storage_class_ops` 能力位可以直接打开,复用现有的"自我复制换存储
 类型"实现路径,不用像 DigitalOcean Spaces 那样另外碰壁。唯一的限制是 `GLACIER` 只在 `fr-par` 和
-`nl-ams` 两个区域可用——但 Nebula 拿不到"当前 bucket 所在区域是否支持该存储类型"这层信息,不在
+`nl-ams` 两个区域可用——但 BucketForge 拿不到"当前 bucket 所在区域是否支持该存储类型"这层信息,不在
 客户端做额外校验,交给服务端在真正设置时报错,这和已有的"不做无法验证的提前拦截"原则一致。
 
 ## ACL:协议层支持,但官方语义比 AWS 简化
 
 官方文档描述的"对象可见性"模型只有 `public`/`private` 两态,没有强调 `public-read-write`、
 `authenticated-read` 等更细粒度的 canned ACL——但协议层接受标准的 `x-amz-acl` 头,和
-Nebula 现有 `set_object_acl(path, public: bool)` 只发送 `public-read`/`private` 两个值的
+BucketForge 现有 `set_object_acl(path, public: bool)` 只发送 `public-read`/`private` 两个值的
 二态模型天然对齐,和 DigitalOcean Spaces 那次"限制刚好卡在我们边界上"是同一类幸运,不是巧合
 第一次出现。
 

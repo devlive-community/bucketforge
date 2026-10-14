@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Nebula",
+  "productName": "BucketForge",
   "version": "1.14.0",
-  "identifier": "org.devlive.nebula",
+  "identifier": "org.devlive.bucketforge",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Nebula",
+        "title": "BucketForge",
         "width": 1160,
         "height": 760,
         "minWidth": 860,
@@ -38,7 +38,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/devlive-community/nebula/releases/latest/download/latest.json"
+        "https://github.com/devlive-community/bucketforge/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUzNDVFMjVCQjU1RjVEOEIKUldTTFhWKzFXK0pGNDJ6Wk5WTGlRdlA4WmJGTlRLSktSbmhpVFYyUzIzL0sxQ1VpRk82QXFWTzgK"
     }

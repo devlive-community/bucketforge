@@ -7,22 +7,22 @@
 //!
 //! 能力矩阵已对照 DigitalOcean 官方文档逐项核实:生命周期规则、CORS、预签名、版本控制
 //! (标准启用/暂停语义)都支持;静态网站托管支持,但官方文档明确只对 Standard Storage 桶
-//! 生效,Cold Storage 桶不支持,Nebula 无法提前判断桶类型,遇到会把后端报错透传;对象标签
+//! 生效,Cold Storage 桶不支持,BucketForge 无法提前判断桶类型,遇到会把后端报错透传;对象标签
 //! 官方文档 / 第三方资料均未找到支持证据,标不支持;对象 ACL 官方文档明确只有 `private`/
-//! `public-read` 两种 canned 值,正好和 Nebula 现有的 `set_object_acl(path, public: bool)`
+//! `public-read` 两种 canned 值,正好和 BucketForge 现有的 `set_object_acl(path, public: bool)`
 //! 完全对上;存储类型转换不支持——Spaces 的"存储类型"是建桶时选 Standard 还是 Cold Storage
 //! 的桶级属性,不是对象级可转换的 `x-amz-storage-class`,而且官方文档明确 CopyObject 在这
-//! 两种桶之间不通,Nebula 的 `set_storage_class` 正是靠自我复制实现的,这条路走不通。
+//! 两种桶之间不通,BucketForge 的 `set_storage_class` 正是靠自我复制实现的,这条路走不通。
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use digitalocean_spaces::{ListEntry, S3Client, S3Error};
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule,
     ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
 };
+use digitalocean_spaces::{ListEntry, S3Client, S3Error};
 
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
 const MULTIPART_PART_SIZE: usize = 8 * 1024 * 1024;
@@ -165,7 +165,7 @@ impl StorageProvider for DoSpacesProvider {
             multipart_upload: true,
             resumable_upload: true,
             // Spaces 的"存储类型"是建桶时选 Standard/Cold 的桶级属性,不是对象级可转换的
-            // x-amz-storage-class;官方文档明确 CopyObject 在两种桶之间不通,Nebula 的
+            // x-amz-storage-class;官方文档明确 CopyObject 在两种桶之间不通,BucketForge 的
             // set_storage_class 正是靠自我复制实现的,这条路走不通。
             storage_class_ops: false,
             bucket_ops: true,
@@ -173,7 +173,7 @@ impl StorageProvider for DoSpacesProvider {
             // 官方文档 / 第三方资料均未找到 PutObjectTagging 支持的证据。
             object_tagging: false,
             multipart_cleanup: true,
-            // 官方文档明确只有 private / public-read 两种 canned ACL,正好是 Nebula
+            // 官方文档明确只有 private / public-read 两种 canned ACL,正好是 BucketForge
             // set_object_acl(path, public: bool) 现在发送的两个值,没有额外限制。
             object_acl: true,
             // 只有 AWS S3 / 华为云 OBS 真支持按账号 ID 授权的对象级 ACL(已在各自 provider 里单独开启),其它厂商不建模。
@@ -183,12 +183,12 @@ impl StorageProvider for DoSpacesProvider {
             hierarchical: false,
             // 官方文档确认支持(过期对象、清理未完成分片上传)。
             bucket_lifecycle: true,
-            // 官方文档确认标准启用/暂停模型,语义和 Nebula 现有实现匹配。
+            // 官方文档确认标准启用/暂停模型,语义和 BucketForge 现有实现匹配。
             versioning: true,
             // 官方文档明确支持给 Space 配置 CORS,走标准接口。
             bucket_cors: true,
             // 官方文档确认支持静态网站托管,但只对 Standard Storage 桶生效——Cold Storage
-            // 桶不支持,Nebula 无法提前判断桶类型,配置失败时把后端报错透传给用户。
+            // 桶不支持,BucketForge 无法提前判断桶类型,配置失败时把后端报错透传给用户。
             bucket_website: true,
         }
     }
@@ -230,10 +230,14 @@ impl StorageProvider for DoSpacesProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -257,7 +261,7 @@ impl StorageProvider for DoSpacesProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -374,7 +378,7 @@ impl StorageProvider for DoSpacesProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

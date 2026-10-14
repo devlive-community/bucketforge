@@ -1,7 +1,7 @@
 ---
 title: 列表是全局的,桶却是分区域的:自动把每个桶路由到它的区域
 date: 2026-07-14
-author: Nebula Team
+author: BucketForge Team
 description: 「列举桶」返回你所有区域的桶,但每个桶只在一个区域;用错区域的 endpoint 访问就打不开。这篇讲怎么让每个桶自动路由到它自己的区域——以及为什么 AWS 要重新签名、阿里/华为/腾讯不用。
 tags: ['开发', '对象存储', '架构', '签名']
 ---
@@ -13,7 +13,7 @@ tags: ['开发', '对象存储', '架构', '签名']
 - AWS:`301 PermanentRedirect` / `AuthorizationHeaderMalformed`
 - 阿里 OSS:`The bucket you are attempting to access must be addressed using the specified endpoint`
 
-之前 Nebula 每个账号只钉一个 endpoint + 区域,所以跨区域的桶「列得出来、打不开」。
+之前 BucketForge 每个账号只钉一个 endpoint + 区域,所以跨区域的桶「列得出来、打不开」。
 
 ## 解决:每个桶自动路由到它自己的区域
 

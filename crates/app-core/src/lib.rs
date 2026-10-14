@@ -1,6 +1,6 @@
 //! # app-core
 //!
-//! Nebula 的**框架无关**业务逻辑层。它持有一个 [`ProviderRegistry`],对上暴露以
+//! BucketForge 的**框架无关**业务逻辑层。它持有一个 [`ProviderRegistry`],对上暴露以
 //! "账号 id + 路径"为参数的高层操作(浏览 / 上传 / 下载 / 删除),对下依赖统一的
 //! [`StorageProvider`] 抽象。
 //!
@@ -17,6 +17,7 @@ mod error;
 mod imaging;
 mod integrity;
 mod largest;
+mod legacy;
 mod limits;
 mod manifest;
 mod matting_plugin;
@@ -31,8 +32,8 @@ mod upload;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use bucketforge_provider::{Entry, ProviderRegistry, StorageProvider};
 use bytes::Bytes;
-use nebula_provider::{Entry, ProviderRegistry, StorageProvider};
 use provider_aliyun::AliyunProvider;
 use provider_aws::AwsProvider;
 use provider_b2::B2Provider;
@@ -49,18 +50,21 @@ use provider_us3::Us3Provider;
 use provider_wasabi::WasabiProvider;
 
 pub use breakdown::{ClassStat, StorageBreakdown};
+pub use bucketforge_pdf::{
+    Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark,
+};
+pub use bucketforge_provider::{
+    ByteStream, Capabilities, CorsRule, EntryKind, Grant, IncompleteUpload, LifecycleRule,
+    ObjectVersion, Page, Permission, ProgressFn, WebsiteConfig,
+};
 pub use content_search::{ContentHit, ContentSearchResult};
 pub use duplicates::{DupGroup, DupResult};
 pub use error::{AppError, Result};
 pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
 pub use integrity::{verify_bytes, Integrity};
 pub use largest::LargestFiles;
+pub use legacy::{migrate_data_dir as migrate_legacy_data_dir, DB_FILE, LEGACY_IDENTIFIER};
 pub use limits::TransferLimits;
-pub use nebula_pdf::{Assembly, NumberPos, PageInfo, PageNumbers, PageSpec, PdfInfo, Watermark};
-pub use nebula_provider::{
-    ByteStream, Capabilities, CorsRule, EntryKind, Grant, IncompleteUpload, LifecycleRule,
-    ObjectVersion, Page, Permission, ProgressFn, WebsiteConfig,
-};
 pub use preview::TextPreview;
 pub use secret::{KeyringSecrets, MemorySecrets, SecretStore};
 pub use settings::Settings;
@@ -232,7 +236,7 @@ pub fn plan_batch_rename(paths: &[String], rule: &RenameRule) -> Vec<RenamePlan>
 }
 
 /// 钥匙串里存储密钥用的服务名。
-const KEYRING_SERVICE: &str = "org.devlive.nebula";
+const KEYRING_SERVICE: &str = "org.devlive.bucketforge";
 
 /// 递归搜索最多扫描的条目数(跨所有层级),防止超大桶把搜索拖死。
 const SEARCH_SCAN_LIMIT: usize = 20_000;
@@ -277,7 +281,9 @@ impl App {
 
     /// 用 SQLite 库路径创建 App,密钥走系统钥匙串,并加载已存账号。
     pub fn with_store(db_path: impl AsRef<std::path::Path>) -> Result<Self> {
-        Self::with_store_and_secrets(db_path, Arc::new(KeyringSecrets::new(KEYRING_SERVICE)))
+        let secrets = KeyringSecrets::new(KEYRING_SERVICE)
+            .with_legacy(legacy::LEGACY_IDENTIFIER, legacy::LEGACY_SECRETS_KEY);
+        Self::with_store_and_secrets(db_path, Arc::new(secrets))
     }
 
     /// 同 [`Self::with_store`],但可注入自定义密钥库(便于测试)。
@@ -1993,7 +1999,7 @@ fn is_within(src_base: &str, dst_base: &str) -> bool {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use nebula_provider::{Capabilities, EntryKind, ProviderError};
+    use bucketforge_provider::{Capabilities, EntryKind, ProviderError};
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -2073,14 +2079,14 @@ mod tests {
         fn capabilities(&self) -> Capabilities {
             Capabilities::default()
         }
-        async fn list(&self, _path: &str) -> nebula_provider::Result<Vec<Entry>> {
+        async fn list(&self, _path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
             let store = self.store.lock().unwrap();
             Ok(store
                 .iter()
                 .map(|(k, v)| Entry::file(k.clone(), v.len() as u64))
                 .collect())
         }
-        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
             let store = self.store.lock().unwrap();
             store
                 .get(path)
@@ -2091,7 +2097,7 @@ mod tests {
                 })
                 .ok_or_else(|| ProviderError::NotFound(path.to_string()))
         }
-        async fn read(&self, path: &str) -> nebula_provider::Result<Bytes> {
+        async fn read(&self, path: &str) -> bucketforge_provider::Result<Bytes> {
             let store = self.store.lock().unwrap();
             store
                 .get(path)
@@ -2103,11 +2109,11 @@ mod tests {
             path: &str,
             data: Bytes,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             self.store.lock().unwrap().insert(path.to_string(), data);
             Ok(())
         }
-        async fn delete(&self, path: &str) -> nebula_provider::Result<()> {
+        async fn delete(&self, path: &str) -> bucketforge_provider::Result<()> {
             self.store.lock().unwrap().remove(path);
             Ok(())
         }
@@ -2130,7 +2136,7 @@ mod tests {
         fn capabilities(&self) -> Capabilities {
             Capabilities::default()
         }
-        async fn list(&self, path: &str) -> nebula_provider::Result<Vec<Entry>> {
+        async fn list(&self, path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
             let entries = match path {
                 "b" => vec![
                     Entry::directory("b/photos"),
@@ -2146,10 +2152,10 @@ mod tests {
             };
             Ok(entries)
         }
-        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
             Ok(Entry::file(path.to_string(), 1))
         }
-        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+        async fn read(&self, _path: &str) -> bucketforge_provider::Result<Bytes> {
             Ok(Bytes::new())
         }
         async fn write(
@@ -2157,10 +2163,10 @@ mod tests {
             _path: &str,
             _data: Bytes,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             Ok(())
         }
-        async fn delete(&self, _path: &str) -> nebula_provider::Result<()> {
+        async fn delete(&self, _path: &str) -> bucketforge_provider::Result<()> {
             Ok(())
         }
     }
@@ -2193,7 +2199,7 @@ mod tests {
         fn capabilities(&self) -> Capabilities {
             Capabilities::default()
         }
-        async fn list(&self, path: &str) -> nebula_provider::Result<Vec<Entry>> {
+        async fn list(&self, path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
             let entries = match path {
                 "b" => vec![Entry::directory("b/photos"), Entry::file("b/readme.txt", 1)],
                 "b/photos" => vec![
@@ -2204,10 +2210,10 @@ mod tests {
             };
             Ok(entries)
         }
-        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
             Ok(Entry::file(path.to_string(), 1))
         }
-        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+        async fn read(&self, _path: &str) -> bucketforge_provider::Result<Bytes> {
             Ok(Bytes::new())
         }
         async fn write(
@@ -2215,28 +2221,32 @@ mod tests {
             _path: &str,
             _data: Bytes,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             Ok(())
         }
-        async fn copy(&self, from: &str, to: &str) -> nebula_provider::Result<()> {
+        async fn copy(&self, from: &str, to: &str) -> bucketforge_provider::Result<()> {
             self.copied
                 .lock()
                 .unwrap()
                 .push((from.to_string(), to.to_string()));
             Ok(())
         }
-        async fn delete(&self, path: &str) -> nebula_provider::Result<()> {
+        async fn delete(&self, path: &str) -> bucketforge_provider::Result<()> {
             self.deleted.lock().unwrap().push(path.to_string());
             Ok(())
         }
-        async fn set_storage_class(&self, path: &str, class: &str) -> nebula_provider::Result<()> {
+        async fn set_storage_class(
+            &self,
+            path: &str,
+            class: &str,
+        ) -> bucketforge_provider::Result<()> {
             self.classed
                 .lock()
                 .unwrap()
                 .push((path.to_string(), class.to_string()));
             Ok(())
         }
-        async fn restore(&self, path: &str, days: u32) -> nebula_provider::Result<()> {
+        async fn restore(&self, path: &str, days: u32) -> bucketforge_provider::Result<()> {
             self.restored.lock().unwrap().push((path.to_string(), days));
             Ok(())
         }
@@ -2658,17 +2668,17 @@ mod tests {
         fn capabilities(&self) -> Capabilities {
             Capabilities::default()
         }
-        async fn list(&self, _path: &str) -> nebula_provider::Result<Vec<Entry>> {
+        async fn list(&self, _path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
             Ok(vec![])
         }
-        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
             let store = self.store.lock().unwrap();
             store
                 .get(path)
                 .map(|v| Entry::file(path.to_string(), v.len() as u64))
                 .ok_or_else(|| ProviderError::NotFound(path.to_string()))
         }
-        async fn read(&self, path: &str) -> nebula_provider::Result<Bytes> {
+        async fn read(&self, path: &str) -> bucketforge_provider::Result<Bytes> {
             let store = self.store.lock().unwrap();
             store
                 .get(path)
@@ -2678,10 +2688,10 @@ mod tests {
         async fn read_stream(
             &self,
             path: &str,
-        ) -> nebula_provider::Result<(Option<u64>, nebula_provider::ByteStream)> {
+        ) -> bucketforge_provider::Result<(Option<u64>, bucketforge_provider::ByteStream)> {
             let data = self.read(path).await?;
             let len = data.len() as u64;
-            let chunks: Vec<nebula_provider::Result<Bytes>> = (0..data.len())
+            let chunks: Vec<bucketforge_provider::Result<Bytes>> = (0..data.len())
                 .step_by(4)
                 .map(|i| Ok(data.slice(i..(i + 4).min(data.len()))))
                 .collect();
@@ -2692,7 +2702,7 @@ mod tests {
             path: &str,
             data: Bytes,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             self.store.lock().unwrap().insert(path.to_string(), data);
             Ok(())
         }
@@ -2700,10 +2710,10 @@ mod tests {
             &self,
             path: &str,
             _len: Option<u64>,
-            mut stream: nebula_provider::ByteStream,
+            mut stream: bucketforge_provider::ByteStream,
             _ct: Option<&str>,
             progress: ProgressFn<'_>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             use futures::StreamExt;
             let mut buf = bytes::BytesMut::new();
             let mut n = 0usize;
@@ -2721,7 +2731,7 @@ mod tests {
             progress(total, total);
             Ok(())
         }
-        async fn delete(&self, path: &str) -> nebula_provider::Result<()> {
+        async fn delete(&self, path: &str) -> bucketforge_provider::Result<()> {
             self.store.lock().unwrap().remove(path);
             Ok(())
         }
@@ -2760,14 +2770,14 @@ mod tests {
         fn capabilities(&self) -> Capabilities {
             Capabilities::default()
         }
-        async fn list(&self, _path: &str) -> nebula_provider::Result<Vec<Entry>> {
+        async fn list(&self, _path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
             Ok(vec![])
         }
         async fn list_page(
             &self,
             _path: &str,
             cursor: Option<String>,
-        ) -> nebula_provider::Result<Page> {
+        ) -> bucketforge_provider::Result<Page> {
             let pages = [["a", "b"], ["c", "d"], ["e", "f"]];
             let idx: usize = cursor.as_deref().and_then(|c| c.parse().ok()).unwrap_or(0);
             let entries = pages[idx]
@@ -2780,10 +2790,10 @@ mod tests {
                 cursor: next,
             })
         }
-        async fn stat(&self, path: &str) -> nebula_provider::Result<Entry> {
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
             Ok(Entry::file(path.to_string(), 1))
         }
-        async fn read(&self, _path: &str) -> nebula_provider::Result<Bytes> {
+        async fn read(&self, _path: &str) -> bucketforge_provider::Result<Bytes> {
             Ok(Bytes::new())
         }
         async fn write(
@@ -2791,10 +2801,10 @@ mod tests {
             _path: &str,
             _data: Bytes,
             _ct: Option<&str>,
-        ) -> nebula_provider::Result<()> {
+        ) -> bucketforge_provider::Result<()> {
             Ok(())
         }
-        async fn delete(&self, _path: &str) -> nebula_provider::Result<()> {
+        async fn delete(&self, _path: &str) -> bucketforge_provider::Result<()> {
             Ok(())
         }
     }
@@ -2872,7 +2882,7 @@ mod tests {
 
     fn temp_db(tag: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
-            "nebula-app-{tag}-{}.db",
+            "bucketforge-app-{tag}-{}.db",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()

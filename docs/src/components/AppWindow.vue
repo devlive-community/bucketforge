@@ -6,7 +6,7 @@
         <span class="w-3 h-3 rounded-full bg-red-400/90"></span>
         <span class="w-3 h-3 rounded-full bg-amber-400/90"></span>
         <span class="w-3 h-3 rounded-full bg-green-400/90"></span>
-        <span class="ml-3 text-xs text-slate-400 font-mono">Nebula</span>
+        <span class="ml-3 text-xs text-slate-400 font-mono">BucketForge</span>
         <span class="ml-auto text-[10px] uppercase tracking-wider text-brand-300/80">connected</span>
       </div>
 

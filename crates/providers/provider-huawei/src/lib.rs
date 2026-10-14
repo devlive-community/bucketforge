@@ -1,20 +1,20 @@
 //! 把 [`huawei_obs::ObsClient`] 适配成统一的 [`StorageProvider`]。
 //!
 //! 这是 App 私有的适配层(不发布):它是唯一同时依赖 `huawei-obs` 和
-//! `nebula-provider` 的地方,从而让纯净 SDK 与 App 抽象彼此解耦。
+//! `bucketforge-provider` 的地方,从而让纯净 SDK 与 App 抽象彼此解耦。
 //!
 //! 路径遵循 [`StorageProvider`] 的 `bucket/key` 约定,解析复用
-//! [`nebula_provider::path::split`]。
+//! [`bucketforge_provider::path::split`]。
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use huawei_obs::{ListEntry, ObsClient, ObsError};
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, CorsRule, Entry, Grant, IncompleteUpload, LifecycleRule,
     ObjectVersion, Permission, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
 };
+use huawei_obs::{ListEntry, ObsClient, ObsError};
 
 /// 把 SDK 的授权条目映射到统一 provider 模型;权限字符串未知(理论上不会发生,SDK 只会
 /// 转发官方 XML 里出现过的值)时静默丢弃这一条,不让一条无法识别的历史授权拖垮整次读取。
@@ -235,10 +235,14 @@ impl StorageProvider for HuaweiProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -262,7 +266,7 @@ impl StorageProvider for HuaweiProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -380,7 +384,7 @@ impl StorageProvider for HuaweiProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

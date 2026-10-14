@@ -1,7 +1,7 @@
 ---
 title: 云端 PDF 页面编辑器:用纯 Rust(lopdf)在后端组装,前端只画缩略图
 date: 2026-07-20
-author: Nebula Team
+author: BucketForge Team
 description: 给云上的 PDF 加一个既能阅读、又能删页 / 重排 / 旋转 / 合并 / 提取的编辑器。这篇讲为什么解析与改写放 Rust(lopdf,无原生依赖)、一个统一的 assemble 怎么把五种操作收敛成一次调用、跨文档合并时对象 id 重编号与可继承属性固化的坑,以及前端 pdf.js 如何只承担渲染而不碰文档结构。
 tags: ['开发', '对象存储', 'PDF', 'Rust', '跨平台']
 ---
@@ -193,7 +193,7 @@ pub fn compress(bytes: &[u8]) -> Result<(Vec<u8>, usize, usize)> {
   app-core: 从云端读主文档
         │
         ▼
-  nebula-pdf::assemble  (重编号 → 固化继承属性 → 重建 Pages → 剪枝压缩)
+  bucketforge-pdf::assemble  (重编号 → 固化继承属性 → 重建 Pages → 剪枝压缩)
         │
         ▼
   写回云端 / 下载本地

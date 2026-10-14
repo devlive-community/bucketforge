@@ -1,19 +1,19 @@
 **English** · [简体中文](README.zh-CN.md) · [Русский](README.ru.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-[![GitHub stars](https://img.shields.io/github/stars/devlive-community/nebula?style=flat&logo=github)](https://github.com/devlive-community/nebula)
-[![Release](https://img.shields.io/github/v/release/devlive-community/nebula?display_name=tag)](https://github.com/devlive-community/nebula/releases)
-[![License](https://img.shields.io/github/license/devlive-community/nebula)](./LICENSE)
-[![GitCode](https://img.shields.io/badge/GitCode-mirror-blue)](https://gitcode.com/trendforge/nebula)
+[![GitHub stars](https://img.shields.io/github/stars/devlive-community/bucketforge?style=flat&logo=github)](https://github.com/devlive-community/bucketforge)
+[![Release](https://img.shields.io/github/v/release/devlive-community/bucketforge?display_name=tag)](https://github.com/devlive-community/bucketforge/releases)
+[![License](https://img.shields.io/github/license/devlive-community/bucketforge)](./LICENSE)
+[![GitCode](https://img.shields.io/badge/GitCode-mirror-blue)](https://gitcode.com/trendforge/bucketforge)
 
-# Nebula
+# BucketForge
 
 **A cross-platform desktop manager for multi-cloud object storage** — manage Aliyun OSS, Tencent COS, Huawei OBS, AWS S3, Cloudflare R2, Qiniu Kodo, MinIO, Backblaze B2, Wasabi, DigitalOcean Spaces, Scaleway Object Storage, UCloud US3, JD Cloud OSS and UPYUN from a single native app, just like a local file manager: browse, upload, download, share and migrate across clouds, all in one place.
 
 Built with Rust + Tauri — lightweight, fast, and native on macOS / Windows / Linux. Each cloud is backed by a hand-written, independently publishable Rust SDK, with no aggregation libraries.
 
-> Website: <https://nebula.devlive.org/> · Download: [GitHub Releases](https://github.com/devlive-community/nebula/releases)
+> Website: <https://bucketforge.devlive.org/> · Download: [GitHub Releases](https://github.com/devlive-community/bucketforge/releases)
 >
-> Repository: [GitHub](https://github.com/devlive-community/nebula) · [GitCode](https://gitcode.com/trendforge/nebula)
+> Repository: [GitHub](https://github.com/devlive-community/bucketforge) · [GitCode](https://gitcode.com/trendforge/bucketforge)
 
 ## Supported clouds
 

@@ -8,8 +8,8 @@ import {releaseRoutes} from './content/releases'
 import {blogRoutes} from './content/blogs'
 
 export const routes: RouteRecordRaw[] = [
-  {path: '/', component: Home, meta: {title: 'Nebula — 多云对象存储管理器'}},
-  {path: '/download', component: Download, meta: {title: '下载 Nebula'}},
+  {path: '/', component: Home, meta: {title: 'BucketForge — 多云对象存储管理器'}},
+  {path: '/download', component: Download, meta: {title: '下载 BucketForge'}},
   {path: '/release', component: ReleaseList, meta: {title: '发布日志'}},
   {path: '/blog', component: BlogList, meta: {title: '技术博客'}},
   ...releaseRoutes.map(r => ({...r, meta: {doc: true, docType: 'release'}})),

@@ -1,14 +1,14 @@
 ---
 title: 实战复盘:手写华为云 OBS SDK 时踩过的签名坑
 date: 2026-07-08
-author: Nebula Team
+author: BucketForge Team
 description: 华为云 OBS 的签名和阿里云 OSS 同宗(都是 S3 V2 风格),照着抄本该很快。但官方文档一个多余的换行、一个被打码的 SK,让"逐字节验证签名"这条铁律差点没法落地。这是我们怎么绕过去的复盘。
 tags: ['开发', 'SDK', '华为云', '签名']
 ---
 
-> 配套阅读:[手把手:为 Nebula 新增一个云厂商 SDK](/blog/build-a-provider-sdk) 是通用流程,本文是给华为云 OBS 落地时的实战复盘,专讲那些"照文档抄会出错"的地方。
+> 配套阅读:[手把手:为 BucketForge 新增一个云厂商 SDK](/blog/build-a-provider-sdk) 是通用流程,本文是给华为云 OBS 落地时的实战复盘,专讲那些"照文档抄会出错"的地方。
 
-Nebula 每家云都是从零手写的独立 Rust SDK,不用任何聚合库。轮到华为云 OBS 时,我们本以为很轻松——它的签名和已经打样过的阿里云 OSS 几乎同构:都是 `base64(HMAC-SHA1(SK, StringToSign))` 的 V2 风格 Header 签名,StringToSign 结构也一样:
+BucketForge 每家云都是从零手写的独立 Rust SDK,不用任何聚合库。轮到华为云 OBS 时,我们本以为很轻松——它的签名和已经打样过的阿里云 OSS 几乎同构:都是 `base64(HMAC-SHA1(SK, StringToSign))` 的 V2 风格 Header 签名,StringToSign 结构也一样:
 
 ```text
 VERB + "\n" + Content-MD5 + "\n" + Content-Type + "\n" + Date + "\n"

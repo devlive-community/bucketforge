@@ -1,12 +1,12 @@
 ---
 title: 告别 localStorage:把配置全搬进本地 SQLite,并按用途分表
 date: 2026-07-18
-author: Nebula Team
-description: 桌面应用里用浏览器 localStorage 存配置,既不可靠也不好备份。这篇讲 Nebula 怎么把账号、收藏、最近访问、界面偏好统一迁进本地 SQLite 并分表,以及前端「先默认渲染、挂载后回填、回填完才回写」的水合套路。
+author: BucketForge Team
+description: 桌面应用里用浏览器 localStorage 存配置,既不可靠也不好备份。这篇讲 BucketForge 怎么把账号、收藏、最近访问、界面偏好统一迁进本地 SQLite 并分表,以及前端「先默认渲染、挂载后回填、回填完才回写」的水合套路。
 tags: ['开发', '持久化', '架构']
 ---
 
-Nebula 是个 Tauri 桌面应用,前端跑在 webview 里。早期一些配置(主题、视图模式、语言、侧栏宽度、收藏夹)图省事存在了浏览器的 `localStorage`。这有几个问题:它绑在 webview 的存储里、不好备份、和后端已有的 SQLite 各存一半,数据是割裂的。
+BucketForge 是个 Tauri 桌面应用,前端跑在 webview 里。早期一些配置(主题、视图模式、语言、侧栏宽度、收藏夹)图省事存在了浏览器的 `localStorage`。这有几个问题:它绑在 webview 的存储里、不好备份、和后端已有的 SQLite 各存一半,数据是割裂的。
 
 于是我们做了一次收敛:**所有配置统一迁进本地 SQLite,并按用途分表。**
 

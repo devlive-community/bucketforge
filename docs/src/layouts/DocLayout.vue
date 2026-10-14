@@ -29,7 +29,7 @@ import {releases} from '../content/releases'
 const route = useRoute()
 const version = computed(() => route.path.match(/\/release\/([^/]+)/)?.[1] ?? '')
 const title = computed(() =>
-  version.value ? `Nebula v${version.value} 发布日志` : '发布日志'
+  version.value ? `BucketForge v${version.value} 发布日志` : '发布日志'
 )
 
 // 按版本设置分享元信息(修复分享显示成通用「发布日志」)。
@@ -40,7 +40,7 @@ useHead({
     {property: 'og:title', content: () => title.value},
     {
       property: 'og:url',
-      content: () => `https://nebula.devlive.org/release/${version.value}`,
+      content: () => `https://bucketforge.devlive.org/release/${version.value}`,
     },
     {name: 'twitter:title', content: () => title.value},
   ],

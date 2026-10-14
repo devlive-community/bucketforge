@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 升级 Nebula 版本号。改 4 处版本号并同步两个 Cargo.lock。
+# 升级 BucketForge 版本号。改 4 处版本号并同步两个 Cargo.lock。
 # 内部依赖用 `version = "1"`(见各 crate Cargo.toml),所以不用逐 crate 改。
 #
 # 用法:

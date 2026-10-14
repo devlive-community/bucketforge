@@ -1,7 +1,7 @@
 //! 文件夹清单导出:把一个文件夹下所有对象列成 CSV(路径 / 大小 / 时间 / 存储类 / ETag),
 //! 用于盘点、审计、离线归档。CSV 生成是纯函数,便于测试转义等边界。
 
-use nebula_provider::Entry;
+use bucketforge_provider::Entry;
 
 use crate::{App, Result};
 

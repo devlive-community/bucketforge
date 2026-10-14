@@ -1,4 +1,4 @@
-/** Nebula 品牌标志(星云徽章)。 */
+/** BucketForge 品牌标志(星云徽章)。 */
 export function Logo({ size = 28 }: { size?: number }) {
   return (
     <svg
@@ -10,7 +10,7 @@ export function Logo({ size = 28 }: { size?: number }) {
     >
       <defs>
         <linearGradient
-          id="nebula-logo-bg"
+          id="bucketforge-logo-bg"
           x1="140"
           y1="120"
           x2="900"
@@ -21,7 +21,7 @@ export function Logo({ size = 28 }: { size?: number }) {
           <stop offset="1" stopColor="#8B5CF6" />
         </linearGradient>
       </defs>
-      <rect x="96" y="96" width="832" height="832" rx="200" fill="url(#nebula-logo-bg)" />
+      <rect x="96" y="96" width="832" height="832" rx="200" fill="url(#bucketforge-logo-bg)" />
       <ellipse
         cx="512"
         cy="520"

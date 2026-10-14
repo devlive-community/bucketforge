@@ -1,9 +1,9 @@
-# Nebula — 全平台多云存储管理器 (workspace 根)
+# BucketForge — 全平台多云存储管理器 (workspace 根)
 #
 # 依赖方向严格单向,不可反向:
 #   cloud-core → 各厂商 SDK → providers 适配层 → app/src-tauri
 #
-# 厂商 SDK 用厂商原名(便于被搜索到),App 层用 nebula- 前缀。
+# 厂商 SDK 用厂商原名(便于被搜索到),App 层用 bucketforge- 前缀。
 
 [workspace]
 resolver = "2"
@@ -36,16 +36,16 @@ members = [
     "crates/upyun-uss",
 
     # App 统一抽象 trait(可选发布)
-    "crates/nebula-provider",
+    "crates/bucketforge-provider",
 
     # 图片处理流水线(纯函数,无云依赖,加速图片浏览 / 编辑)
-    "crates/nebula-image",
+    "crates/bucketforge-image",
 
     # AI 抠图(去背景),ort 运行时动态加载,作为可选插件
-    "crates/nebula-matting",
+    "crates/bucketforge-matting",
 
     # PDF 页面操作(纯 Rust lopdf,无原生依赖)
-    "crates/nebula-pdf",
+    "crates/bucketforge-pdf",
 
     # App 业务逻辑(框架无关,App 私有)
     "crates/app-core",
@@ -84,7 +84,7 @@ futures = "0.3"
 version = "1.14.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/devlive-community/nebula"
+repository = "https://github.com/devlive-community/bucketforge"
 authors = ["shicheng <shicheng@devlive.org>"]
 
 [profile.release]

@@ -1,12 +1,12 @@
 ---
 title: 把「AI 去背景」做成一个可下载的插件:本地抠图与三平台运行时的那些坑
 date: 2026-07-18
-author: Nebula Team
-description: 给云端图片编辑器加一键去背景,不想让安装包平白胖几十 MB,也不想联网把用户的图传给第三方。这篇讲 Nebula 怎么把 ONNX Runtime + u2netp 做成「用时才下载」的插件、为什么运行时要懒加载、以及在 macOS / Windows / Linux 三个平台的发布包里精准挑出「真正那一个」动态库时踩的一串同名文件坑。
+author: BucketForge Team
+description: 给云端图片编辑器加一键去背景,不想让安装包平白胖几十 MB,也不想联网把用户的图传给第三方。这篇讲 BucketForge 怎么把 ONNX Runtime + u2netp 做成「用时才下载」的插件、为什么运行时要懒加载、以及在 macOS / Windows / Linux 三个平台的发布包里精准挑出「真正那一个」动态库时踩的一串同名文件坑。
 tags: ['开发', 'AI', '对象存储', '图片', '跨平台']
 ---
 
-Nebula 的图片编辑器已经能裁剪、调色、打码、标注。下一个自然的需求是**一键去背景**——把主体抠出来、背景变透明。要做得体面,有两条硬约束:
+BucketForge 的图片编辑器已经能裁剪、调色、打码、标注。下一个自然的需求是**一键去背景**——把主体抠出来、背景变透明。要做得体面,有两条硬约束:
 
 1. **不能让默认安装包变胖。** 抠图要跑神经网络,ONNX Runtime 的动态库在 macOS 上就有 70 MB,直接打进包里,所有不用这个功能的人都得白背这份体积。
 2. **不能把图传出去。** 这是个对象存储管理器,用户的图往往是私有资产。调云端 API 去背景,等于把原图交给第三方——不可接受。
@@ -29,7 +29,7 @@ ort = { version = "=2.0.0-rc.10", default-features = false, features = ["load-dy
 - CI 不需要任何 ONNX 依赖就能编译;
 - 动态库由「插件安装」流程在运行时下载到用户数据目录。
 
-抠图本身是一个不依赖任何云的纯函数 crate `nebula-matting`:输入图片字节 + 模型字节,输出透明 PNG 字节。
+抠图本身是一个不依赖任何云的纯函数 crate `bucketforge-matting`:输入图片字节 + 模型字节,输出透明 PNG 字节。
 
 ```rust
 pub fn remove_background(model_bytes: &[u8], img_bytes: &[u8]) -> Result<Vec<u8>, MattingError> {

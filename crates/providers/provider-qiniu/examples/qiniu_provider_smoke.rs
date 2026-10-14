@@ -11,8 +11,8 @@
 use std::env;
 use std::sync::Arc;
 
+use bucketforge_provider::{ProviderRegistry, StorageProvider};
 use bytes::Bytes;
-use nebula_provider::{ProviderRegistry, StorageProvider};
 use provider_qiniu::QiniuProvider;
 
 #[tokio::main]
@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("      · {bucket}/ 顶层:{dirs} 个目录,{files} 个文件");
 
     // 2) 写入对象
-    let path = format!("{bucket}/nebula-provider-smoke.txt");
+    let path = format!("{bucket}/bucketforge-provider-smoke.txt");
     let content = Bytes::from_static(b"hello via unified StorageProvider");
     provider
         .write(&path, content.clone(), Some("text/plain"))

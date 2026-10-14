@@ -7,11 +7,11 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 
-use minio_s3::{ListEntry, S3Client, S3Error};
-use nebula_provider::{
+use bucketforge_provider::{
     path, ByteStream, Capabilities, Entry, IncompleteUpload, LifecycleRule, ObjectVersion,
     ProgressFn, ProviderError, Result, StorageProvider,
 };
+use minio_s3::{ListEntry, S3Client, S3Error};
 
 const MULTIPART_THRESHOLD: usize = 16 * 1024 * 1024;
 const MULTIPART_PART_SIZE: usize = 8 * 1024 * 1024;
@@ -171,10 +171,14 @@ impl StorageProvider for MinioProvider {
         }
     }
 
-    async fn list_page(&self, path: &str, cursor: Option<String>) -> Result<nebula_provider::Page> {
+    async fn list_page(
+        &self,
+        path: &str,
+        cursor: Option<String>,
+    ) -> Result<bucketforge_provider::Page> {
         match path::split(path) {
             // 根:桶数量少,一次列全,无分页。
-            (None, _) => Ok(nebula_provider::Page {
+            (None, _) => Ok(bucketforge_provider::Page {
                 entries: self.list(path).await?,
                 cursor: None,
             }),
@@ -198,7 +202,7 @@ impl StorageProvider for MinioProvider {
                         }
                     })
                     .collect();
-                Ok(nebula_provider::Page {
+                Ok(bucketforge_provider::Page {
                     entries,
                     cursor: page.next,
                 })
@@ -315,7 +319,7 @@ impl StorageProvider for MinioProvider {
         // 已知且不大的对象:收集后简单 PUT,省去分片握手。
         if let Some(l) = len {
             if !should_multipart(l as usize) {
-                let data = nebula_provider::collect_stream(stream).await?;
+                let data = bucketforge_provider::collect_stream(stream).await?;
                 progress(0, l);
                 self.client
                     .put_object(bucket, key, data, content_type)

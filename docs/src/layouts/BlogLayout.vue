@@ -97,7 +97,7 @@ useHead({
     {property: 'og:description', content: () => currentBlog.value?.description ?? ''},
     {
       property: 'og:url',
-      content: () => `https://nebula.devlive.org/blog/${currentSlug.value ?? ''}`,
+      content: () => `https://bucketforge.devlive.org/blog/${currentSlug.value ?? ''}`,
     },
     {name: 'twitter:title', content: () => currentBlog.value?.title ?? '技术博客'},
     {
