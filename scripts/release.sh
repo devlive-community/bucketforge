@@ -5,18 +5,23 @@
 # 做什么:预检 → 推送当前分支 → 打 tag `vX.Y.Z` 并推送 → 触发
 # .github/workflows/release.yml(多平台构建 + 签名 updater 产物 + 建**草稿** Release)。
 # 加 --publish 时,等构建成功后把草稿转为正式发布(此后 latest.json 生效,自动更新可用)。
+# 发布完成后自动把版本推进到下一个开发周期(默认次版本 +1,--next 可指定,--no-bump 可关闭),
+# 以 `chore: bump version to <NEXT> for the next development cycle` 提交并推送。
 #
 # 用法:
 #   scripts/release.sh                 # 用 tauri.conf.json 里的当前版本发布
 #   scripts/release.sh 1.4.0           # 指定版本发布
 #   scripts/release.sh 1.4.0 --watch   # 打完 tag 后跟踪构建日志
 #   scripts/release.sh 1.4.0 --publish # 构建成功后自动把草稿转正式发布(含 --watch)
+#   scripts/release.sh 1.4.0 --next 1.5.0  # 发布后推进到指定版本(默认次版本 +1)
+#   scripts/release.sh 1.4.0 --no-bump # 发布后不自动推进版本
 #   scripts/release.sh -y 1.4.0        # 跳过确认
 #
 # 前置条件:
 #   - 版本号已改好(scripts/bump-version.sh <X.Y.Z>)且已提交
 #   - 发布日志 docs/src/content/release/<X.Y.Z>.md 已写好且已提交
 #   - 仓库 Secrets 配好 TAURI_SIGNING_PRIVATE_KEY / _PASSWORD(否则 updater 产物不签名)
+#   - 自动推进版本需要本机有 cargo(scripts/bump-version.sh 会用它同步 Cargo.lock)
 #
 set -euo pipefail
 
@@ -25,13 +30,15 @@ cd "$ROOT"
 
 # ── 解析参数 ───────────────────────────────────────────────────────────────
 VERSION=""
+NEXT=""
 ASSUME_YES=0
 WATCH=0
 PUBLISH=0
 ALLOW_DIRTY=0
+BUMP=1
 
 usage() {
-  sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -41,6 +48,11 @@ while [ $# -gt 0 ]; do
     --watch)           WATCH=1 ;;
     --publish)         PUBLISH=1; WATCH=1 ;;
     --allow-dirty)     ALLOW_DIRTY=1 ;;
+    --no-bump)         BUMP=0 ;;
+    --next)
+      [ $# -ge 2 ] || { echo "参数 --next 需要版本号,如 --next 1.5.0" >&2; usage 1; }
+      NEXT="$2"; shift
+      ;;
     -h|--help)         usage 0 ;;
     -*)                echo "未知参数:$1" >&2; usage 1 ;;
     *)
@@ -63,6 +75,19 @@ conf_version() {
 printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
   || die "版本号非法:'$VERSION'(应形如 1.4.0)"
 TAG="v$VERSION"
+
+# ── 下一版本:发布完成后自动推进的目标,默认次版本 +1 ──────────────────────
+if [ "$BUMP" -eq 1 ]; then
+  if [ -z "$NEXT" ]; then
+    minor="$(printf '%s' "$VERSION" | cut -d. -f2)"
+    NEXT="$(printf '%s' "$VERSION" | cut -d. -f1).$((10#${minor} + 1)).0"
+  fi
+  printf '%s' "$NEXT" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+    || die "下一版本号非法:'$NEXT'(应形如 1.5.0)"
+  [ "$NEXT" != "$VERSION" ] || die "下一版本号($NEXT)不能与当前版本相同"
+elif [ -n "$NEXT" ]; then
+  echo "⚠ 已指定 --next $NEXT,但同时给了 --no-bump,本次不会推进版本。"
+fi
 
 # ── 预检 ───────────────────────────────────────────────────────────────────
 # 1) 四处版本号必须一致,且等于要发布的版本
@@ -111,6 +136,11 @@ echo "即将发布:"
 echo "  版本   $VERSION  (tag ${TAG})"
 echo "  分支   ${BRANCH} → origin/${BRANCH}"
 echo "  正文   $NOTES"
+if [ "$BUMP" -eq 1 ]; then
+  echo "  后续   发布后自动推进版本到 ${NEXT} 并推送(--no-bump 关闭)"
+else
+  echo "  后续   不自动推进版本"
+fi
 echo "  动作   推分支 + 打 tag → 触发 CI 多平台构建,建草稿 Release$([ "$PUBLISH" -eq 1 ] && echo ',构建成功后自动转正式发布')"
 echo
 if [ "$ASSUME_YES" -eq 0 ]; then
@@ -120,6 +150,23 @@ if [ "$ASSUME_YES" -eq 0 ]; then
 fi
 
 # ── 执行 ───────────────────────────────────────────────────────────────────
+# ── 发布完成后:自动推进版本到下一个开发周期 ──────────────────────────────
+# 复用 bump-version.sh 改四处版本号并同步 Cargo.lock,只提交这六个版本文件,
+# 不碰工作区里其它未提交改动。tag 已指向发布 commit,不受这次提交影响。
+next_cycle_bump() {
+  note "推进版本到 ${NEXT}(下一个开发周期)…"
+  if ! out="$("$ROOT/scripts/bump-version.sh" "$NEXT" 2>&1)"; then
+    printf '%s\n' "$out" >&2
+    die "自动推进版本失败;请手动执行 scripts/bump-version.sh ${NEXT} 并提交推送"
+  fi
+  git add -- Cargo.toml Cargo.lock app/package.json app/src-tauri/Cargo.toml \
+             app/src-tauri/Cargo.lock app/src-tauri/tauri.conf.json
+  git commit -q -m "chore: bump version to ${NEXT} for the next development cycle"
+  note "推送版本推进提交到 ${BRANCH}…"
+  git push origin "${BRANCH}"
+  echo "✓ 版本已推进到 ${NEXT};下次发布前记得先写 docs/src/content/release/${NEXT}.md"
+}
+
 note "推送分支 ${BRANCH}…"
 git push origin "${BRANCH}"
 
@@ -154,11 +201,19 @@ if [ "$WATCH" -eq 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/n
       else
         echo "→ 到 Releases 页面复核草稿 BucketForge ${TAG},确认无误后点 Publish。"
       fi
+      if [ "$BUMP" -eq 1 ]; then
+        next_cycle_bump
+      fi
     else
       die "CI 构建失败;请查看日志:gh run view ${run_id} --log-failed"
     fi
   fi
 else
+  if [ "$BUMP" -eq 1 ]; then
+    next_cycle_bump
+  else
+    echo "→ 版本保持 ${VERSION};进入下一个开发周期时手动执行 scripts/bump-version.sh <X.Y.Z>"
+  fi
   echo
   echo "接下来:"
   echo "  1. 在 Actions 里等三平台(macOS/Linux/Windows)构建完成"
