@@ -320,6 +320,7 @@ body.resizing {
 /* ---------- Toolbar ---------- */
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -1100,14 +1101,18 @@ body.resizing {
 }
 
 .details__actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
 }
 
+/* 两列网格排列,按钮再多也不会把抽屉撑出窗口;文字过长时省略。 */
 .details__actions .btn {
-  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1120,6 +1125,9 @@ body.resizing {
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 14px;
   align-content: start;
+  /* 卡片 overflow:hidden 使其自动最小高度为 0,条目一多 auto 行会被压扁成细横条;
+     固定按内容高度排行。 */
+  grid-auto-rows: max-content;
 }
 
 .card {
