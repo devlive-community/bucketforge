@@ -143,8 +143,6 @@ pub struct AccountInfo {
     pub endpoint: String,
     /// 自定义公共域名(CDN / CNAME);空表示未配置。
     pub custom_domain: String,
-    /// 预设 bucket(打开账号直达);空表示未配置。
-    pub default_bucket: String,
 }
 
 /// 传输面板任务的持久化记录,用于跨重启恢复列表。字段与前端 TransferItem 对应;
@@ -235,11 +233,6 @@ pub fn plan_batch_rename(paths: &[String], rule: &RenameRule) -> Vec<RenamePlan>
         }
     }
     plans
-}
-
-/// 规范化用户填写的预设 bucket:去掉首尾空白与 `/`。
-fn normalize_bucket(bucket: &str) -> &str {
-    bucket.trim().trim_matches('/')
 }
 
 /// 钥匙串里存储密钥用的服务名。
@@ -443,7 +436,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -472,7 +464,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -500,7 +491,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -528,7 +518,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -556,7 +545,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -584,7 +572,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -613,7 +600,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -641,7 +627,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -669,7 +654,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -697,7 +681,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -725,7 +708,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -753,7 +735,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -781,7 +762,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -809,7 +789,6 @@ impl App {
             access_key_secret: String::new(),
             endpoint: endpoint.into(),
             custom_domain: String::new(),
-            default_bucket: String::new(),
         };
         if let Some(store) = &self.store {
             store.upsert(&rec)?;
@@ -889,7 +868,6 @@ impl App {
                 access_key_id: r.access_key_id,
                 endpoint: r.endpoint,
                 custom_domain: r.custom_domain,
-                default_bucket: r.default_bucket,
             })
     }
 
@@ -901,35 +879,8 @@ impl App {
         Ok(())
     }
 
-    /// 设置某账号的预设 bucket;空串清除。首尾的 `/` 与空白会被去掉。
-    pub fn set_account_default_bucket(&self, account: &str, bucket: &str) -> Result<()> {
-        if let Some(store) = &self.store {
-            store.set_default_bucket(account, normalize_bucket(bucket))?;
-        }
-        Ok(())
-    }
-
-    /// 某账号配置的预设 bucket;未配置返回 `None`。
-    pub fn default_bucket(&self, account: &str) -> Option<String> {
-        let rec = self.store.as_ref()?.get(account).ok()??;
-        let bucket = normalize_bucket(&rec.default_bucket);
-        (!bucket.is_empty()).then(|| bucket.to_string())
-    }
-
-    /// 配了预设 bucket 的账号在根目录只列这一个桶,不调 ListBuckets——只授权了单个桶的
-    /// AK 没有 ListBuckets 权限,直接列会失败。
-    fn preset_root(&self, account: &str, path: &str) -> Option<Vec<Entry>> {
-        if !path.trim_matches('/').is_empty() {
-            return None;
-        }
-        Some(vec![Entry::directory(self.default_bucket(account)?)])
-    }
-
     /// 浏览某账号下某路径(桶 / 前缀)的条目。
     pub async fn browse(&self, account: &str, path: &str) -> Result<Vec<Entry>> {
-        if let Some(entries) = self.preset_root(account, path) {
-            return Ok(entries);
-        }
         Ok(self.provider(account)?.list(path).await?)
     }
 
@@ -940,12 +891,6 @@ impl App {
         path: &str,
         cursor: Option<String>,
     ) -> Result<Page> {
-        if let Some(entries) = self.preset_root(account, path) {
-            return Ok(Page {
-                entries,
-                cursor: None,
-            });
-        }
         Ok(self.provider(account)?.list_page(path, cursor).await?)
     }
 
@@ -2966,36 +2911,6 @@ mod tests {
             let app = App::with_store_and_secrets(&path, secrets.clone()).unwrap();
             assert!(app.accounts().is_empty());
         }
-        let _ = std::fs::remove_file(&path);
-    }
-
-    #[tokio::test]
-    async fn default_bucket_short_circuits_root_listing() {
-        let path = temp_db("default-bucket");
-        let secrets: Arc<dyn SecretStore> = Arc::new(MemorySecrets::default());
-        let app = App::with_store_and_secrets(&path, secrets).unwrap();
-        // 不可达的 endpoint:若根目录真去调 ListBuckets 会报错,而预设 bucket 不应发请求。
-        app.add_aliyun_account("acc", "ak", "sk", "127.0.0.1:1")
-            .unwrap();
-        assert_eq!(app.default_bucket("acc"), None);
-
-        app.set_account_default_bucket("acc", " /photos/ ").unwrap();
-        assert_eq!(app.default_bucket("acc").as_deref(), Some("photos"));
-        assert_eq!(app.account_info("acc").unwrap().default_bucket, "photos");
-
-        let root = app.browse("acc", "").await.unwrap();
-        assert_eq!(root, vec![Entry::directory("photos")]);
-        let page = app.browse_page("acc", "/", None).await.unwrap();
-        assert_eq!(page.entries, vec![Entry::directory("photos")]);
-        assert_eq!(page.cursor, None);
-
-        // 重新保存凭证不应清掉预设 bucket。
-        app.add_aliyun_account("acc", "ak2", "sk2", "127.0.0.1:1")
-            .unwrap();
-        assert_eq!(app.default_bucket("acc").as_deref(), Some("photos"));
-
-        app.set_account_default_bucket("acc", "").unwrap();
-        assert_eq!(app.default_bucket("acc"), None);
         let _ = std::fs::remove_file(&path);
     }
 
