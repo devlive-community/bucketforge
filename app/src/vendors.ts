@@ -6,7 +6,7 @@ export const VENDORS = {
     akLabel: "AccessKeyId",
     skLabel: "AccessKeySecret",
     endpoint: "oss-cn-hangzhou.aliyuncs.com",
-    idPlaceholder: "如 aliyun-main",
+    idPlaceholder: "aliyun-main",
   },
   huawei: {
     label: "华为云 OBS",
@@ -14,7 +14,7 @@ export const VENDORS = {
     akLabel: "AccessKey(AK)",
     skLabel: "SecretKey(SK)",
     endpoint: "obs.cn-north-4.myhuaweicloud.com",
-    idPlaceholder: "如 huawei-main",
+    idPlaceholder: "huawei-main",
   },
   tencent: {
     label: "腾讯云 COS",
@@ -22,7 +22,7 @@ export const VENDORS = {
     akLabel: "SecretId",
     skLabel: "SecretKey",
     endpoint: "cos.ap-beijing.myqcloud.com",
-    idPlaceholder: "如 tencent-main",
+    idPlaceholder: "tencent-main",
   },
   qiniu: {
     label: "七牛云 Kodo",
@@ -30,7 +30,7 @@ export const VENDORS = {
     akLabel: "AccessKey(AK)",
     skLabel: "SecretKey(SK)",
     endpoint: "s3.cn-east-1.qiniucs.com",
-    idPlaceholder: "如 qiniu-main",
+    idPlaceholder: "qiniu-main",
   },
   aws: {
     label: "AWS S3",
@@ -38,7 +38,7 @@ export const VENDORS = {
     akLabel: "Access Key ID",
     skLabel: "Secret Access Key",
     endpoint: "s3.us-east-1.amazonaws.com",
-    idPlaceholder: "如 aws-main",
+    idPlaceholder: "aws-main",
   },
   r2: {
     label: "Cloudflare R2",
@@ -46,7 +46,7 @@ export const VENDORS = {
     akLabel: "Access Key ID",
     skLabel: "Secret Access Key",
     endpoint: "<account_id>.r2.cloudflarestorage.com",
-    idPlaceholder: "如 r2-main",
+    idPlaceholder: "r2-main",
   },
   minio: {
     label: "MinIO",
@@ -54,7 +54,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "http://minio.example.com:9000",
-    idPlaceholder: "如 minio-main",
+    idPlaceholder: "minio-main",
   },
   b2: {
     label: "Backblaze B2",
@@ -62,7 +62,7 @@ export const VENDORS = {
     akLabel: "Key ID",
     skLabel: "Application Key",
     endpoint: "s3.<region>.backblazeb2.com",
-    idPlaceholder: "如 b2-main",
+    idPlaceholder: "b2-main",
   },
   wasabi: {
     label: "Wasabi",
@@ -70,7 +70,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "s3.<region>.wasabisys.com",
-    idPlaceholder: "如 wasabi-main",
+    idPlaceholder: "wasabi-main",
   },
   do_spaces: {
     label: "DigitalOcean Spaces",
@@ -78,7 +78,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "<region>.digitaloceanspaces.com",
-    idPlaceholder: "如 do-spaces-main",
+    idPlaceholder: "do-spaces-main",
   },
   scaleway: {
     label: "Scaleway Object Storage",
@@ -86,7 +86,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "s3.<region>.scw.cloud",
-    idPlaceholder: "如 scaleway-main",
+    idPlaceholder: "scaleway-main",
   },
   us3: {
     label: "UCloud US3",
@@ -94,7 +94,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "s3-<region>.ufileos.com",
-    idPlaceholder: "如 us3-main",
+    idPlaceholder: "us3-main",
   },
   jdcloud: {
     label: "京东云 OSS",
@@ -102,7 +102,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "s3.cn-south-1.jdcloud-oss.com",
-    idPlaceholder: "如 jdcloud-main",
+    idPlaceholder: "jdcloud-main",
   },
   upyun: {
     label: "又拍云",
@@ -110,7 +110,7 @@ export const VENDORS = {
     akLabel: "Access Key",
     skLabel: "Secret Key",
     endpoint: "s3.api.upyun.com",
-    idPlaceholder: "如 upyun-main",
+    idPlaceholder: "upyun-main",
   },
 } as const;
 

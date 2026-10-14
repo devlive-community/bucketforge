@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../i18n";
 
 interface Props {
   title: string;
@@ -13,10 +14,11 @@ export function PromptDialog({
   title,
   placeholder,
   initial = "",
-  submitLabel = "确定",
+  submitLabel,
   onSubmit,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
   const [value, setValue] = useState(initial);
   const trimmed = value.trim();
 
@@ -40,14 +42,14 @@ export function PromptDialog({
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
-            取消
+            {t("取消")}
           </button>
           <button
             className="btn btn--primary"
             disabled={!trimmed}
             onClick={() => onSubmit(trimmed)}
           >
-            {submitLabel}
+            {submitLabel ?? t("确定")}
           </button>
         </div>
       </div>

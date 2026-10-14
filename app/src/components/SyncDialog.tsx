@@ -348,7 +348,7 @@ export function SyncDialog({ accounts, defaultAccount, defaultPrefix, onClose }:
                 .map((it) => (
                   <div className="sync__row" key={it.rel_path}>
                     <span className={`sync__act sync__act--${it.action}`}>
-                      {ACTION_LABEL[it.action]}
+                      {t(ACTION_LABEL[it.action])}
                     </span>
                     <span className="sync__path" title={it.rel_path}>
                       {it.rel_path}

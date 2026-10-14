@@ -21,8 +21,8 @@ interface Props {
   onCancel: () => void;
 }
 
-const accountLabel = (a: AccountInfo): string => {
-  const vendor = (VENDORS as Record<string, { label: string }>)[a.vendor]?.label ?? a.vendor;
+const accountLabel = (a: AccountInfo, t: (zh: string) => string): string => {
+  const vendor = t((VENDORS as Record<string, { label: string }>)[a.vendor]?.label ?? a.vendor);
   return `${vendor} · ${a.id}`;
 };
 
@@ -33,8 +33,8 @@ const accountLabel = (a: AccountInfo): string => {
 export function MigrateDialog({ accounts, srcAccount, from, isFolder, onConfirm, onCancel }: Props) {
   const { t } = useI18n();
   const options = useMemo(
-    () => accounts.map((a) => ({ value: a.id, label: accountLabel(a) })),
-    [accounts],
+    () => accounts.map((a) => ({ value: a.id, label: accountLabel(a, t) })),
+    [accounts, t],
   );
   const [dstAccount, setDstAccount] = useState(
     () => accounts.find((a) => a.id !== srcAccount)?.id ?? accounts[0]?.id ?? "",

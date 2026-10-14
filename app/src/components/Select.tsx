@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronDown, faCheck } from "@fortawesome/free-solid-svg-icons";
+import { useI18n } from "../i18n";
 
 export interface SelectOption {
   value: string;
@@ -28,6 +29,7 @@ interface Coords {
  * `overflow: hidden` 的祖先裁切或被同层元素遮挡。
  */
 export function Select({ value, options, onChange, disabled }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<Coords | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -102,7 +104,7 @@ export function Select({ value, options, onChange, disabled }: Props) {
         disabled={disabled}
         onClick={toggle}
       >
-        <span>{selected?.label ?? "请选择"}</span>
+        <span>{selected?.label ?? t("请选择")}</span>
         <FontAwesomeIcon className="select__chevron" icon={faChevronDown} />
       </button>
 

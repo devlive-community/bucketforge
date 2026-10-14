@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
 import { Select } from "./Select";
 import { VENDORS, type Vendor } from "../vendors";
+import { useI18n } from "../i18n";
 
 interface Props {
   /** 编辑模式的回填值;不传为新增。 */
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export function AccountForm({ initial, onSubmit, onClose }: Props) {
+  const { t } = useI18n();
   const editing = !!initial;
   const [vendor, setVendor] = useState<Vendor>(
     (initial?.vendor as Vendor) in VENDORS ? (initial!.vendor as Vendor) : "aliyun",
@@ -71,7 +73,9 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
           <h3>
-            {editing ? `编辑${meta.label} 账号` : `添加${meta.label} 账号`}
+            {editing
+              ? t("编辑{vendor} 账号", { vendor: t(meta.label) })
+              : t("添加{vendor} 账号", { vendor: t(meta.label) })}
           </h3>
           <button className="modal__close" onClick={onClose}>
             <FontAwesomeIcon icon={faXmark} />
@@ -82,23 +86,23 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           {/* 用 div 而非 label:label 会把点击转发给关联控件,导致选项点击后
               触发器又被 toggle 回打开状态。 */}
           <div className="field">
-            <span>云厂商</span>
+            <span>{t("云厂商")}</span>
             <Select
               value={vendor}
               disabled={editing}
               onChange={(v) => changeVendor(v as Vendor)}
               options={Object.entries(VENDORS).map(([key, v]) => ({
                 value: key,
-                label: v.label,
+                label: t(v.label),
               }))}
             />
           </div>
           <label className="field">
-            <span>账号别名</span>
+            <span>{t("账号别名")}</span>
             <input
               value={id}
               onChange={(e) => setId(e.target.value)}
-              placeholder={meta.idPlaceholder}
+              placeholder={t("如 {name}", { name: meta.idPlaceholder })}
               autoFocus={!editing}
             />
           </label>
@@ -108,8 +112,8 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
           </label>
           <label className="field">
             <span>
-            {meta.skLabel}
-              {editing ? (credentialsChanged ? "(请重新输入)" : "(可留空)") : ""}
+              {meta.skLabel}
+              {editing ? (credentialsChanged ? t("(请重新输入)") : t("(可留空)")) : ""}
             </span>
             <input
               type="password"
@@ -129,33 +133,33 @@ export function AccountForm({ initial, onSubmit, onClose }: Props) {
             />
           </label>
           <label className="field">
-            <span>公共域名(可选)</span>
+            <span>{t("公共域名(可选)")}</span>
             <input
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
-              placeholder="cdn.example.com — 设为公开读后用它拼永久直链"
+              placeholder={t("cdn.example.com — 设为公开读后用它拼永久直链")}
             />
           </label>
           <label className="field">
-            <span>指定 Bucket(可选)</span>
+            <span>{t("指定 Bucket(可选)")}</span>
             <input
               value={bucket}
               onChange={(e) => setBucket(e.target.value)}
-              placeholder="仅有单桶权限时填写"
+              placeholder={t("仅有单桶权限时填写")}
             />
           </label>
         </div>
 
         <div className="modal__footer">
           <button className="btn" onClick={onClose}>
-            取消
+            {t("取消")}
           </button>
           <button
             className="btn btn--primary"
             disabled={!valid}
-          onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain, bucket)}
+            onClick={() => onSubmit(vendor, id, ak, sk, endpoint, domain, bucket)}
           >
-            {editing ? "保存" : "添加"}
+            {editing ? t("保存") : t("添加")}
           </button>
         </div>
       </div>

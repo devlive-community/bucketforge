@@ -42,7 +42,7 @@ export function ShareDialog({ url, minutes, upload, onClose }: Props) {
             <p className="share__note">
               {t("持链接者用 PUT 直接上传即可,例如:")}
               <br />
-              <code>curl -X PUT --upload-file 文件 "链接"</code>
+              <code>{t('curl -X PUT --upload-file 文件 "链接"')}</code>
             </p>
           )}
         </div>

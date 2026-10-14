@@ -75,7 +75,7 @@ export function CleanupDialog({
                 {uploads.map((u) => (
                   <div className="cleanup__item" key={u.upload_id}>
                     <span className="cleanup__key" title={u.key}>
-                      {u.key || "(空 key)"}
+                      {u.key || t("(空 key)")}
                     </span>
                     <span className="cleanup__time">
                       {u.initiated ? formatDate(u.initiated) : "—"}

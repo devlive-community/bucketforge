@@ -64,7 +64,7 @@ export function Sidebar({
                 className="account-item__icon"
                 icon={faCloud}
                 style={{ color: meta.color }}
-                title={meta.label}
+                title={t(meta.label)}
               />
               <span className="account-item__name" title={acc.id}>
                 {acc.id}

@@ -10,6 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import type { Entry } from "../types";
 import { formatBytes, formatDate, guessType, storageLabel } from "../util";
+import { useI18n } from "../i18n";
 
 interface Props {
   entry: Entry;
@@ -31,22 +32,23 @@ export function FileDetails({
   onEditTags,
   onEditGrants,
 }: Props) {
+  const { t } = useI18n();
   // 有真实 Content-Type 就显示它,否则按文件名推测。
   const contentType = entry.content_type ?? guessType(entry.name);
   const rows: [string, string][] = [
-    ["名称", entry.name],
-    ["路径", entry.path],
-    ["大小", formatBytes(entry.size)],
-    ["存储类型", storageLabel(entry.storage_class)],
-    ["修改时间", formatDate(entry.last_modified)],
+    [t("名称"), entry.name],
+    [t("路径"), entry.path],
+    [t("大小"), formatBytes(entry.size)],
+    [t("存储类型"), t(storageLabel(entry.storage_class))],
+    [t("修改时间"), formatDate(entry.last_modified)],
     ["ETag", entry.etag ?? "—"],
   ];
 
   return (
     <div className="details">
       <div className="details__header">
-        <span className="details__title">详情</span>
-        <button className="details__close" onClick={onClose} title="关闭">
+        <span className="details__title">{t("详情")}</span>
+        <button className="details__close" onClick={onClose} title={t("关闭")}>
           <FontAwesomeIcon icon={faXmark} />
         </button>
       </div>
@@ -64,12 +66,12 @@ export function FileDetails({
           </div>
         ))}
         <div className="details__row">
-          <span className="details__label">类型</span>
+          <span className="details__label">{t("类型")}</span>
           <span className="details__value">
             {contentType}
             <button
               className="details__edit"
-              title="修改内容类型"
+              title={t("修改内容类型")}
               onClick={() => onEditType(entry)}
             >
               <FontAwesomeIcon icon={faPen} />
@@ -86,16 +88,16 @@ export function FileDetails({
 
       <div className="details__actions">
         <button className="btn btn--primary" onClick={() => onDownload(entry)}>
-          <FontAwesomeIcon icon={faDownload} /> 下载
+          <FontAwesomeIcon icon={faDownload} /> {t("下载")}
         </button>
         <button className="btn" onClick={() => onShare(entry)}>
-          <FontAwesomeIcon icon={faLink} /> 分享链接
+          <FontAwesomeIcon icon={faLink} /> {t("分享链接")}
         </button>
         <button className="btn" onClick={() => onEditTags(entry)}>
-          <FontAwesomeIcon icon={faTags} /> 标签
+          <FontAwesomeIcon icon={faTags} /> {t("标签")}
         </button>
         <button className="btn" onClick={() => onEditGrants(entry)}>
-          <FontAwesomeIcon icon={faUserShield} /> 细粒度授权
+          <FontAwesomeIcon icon={faUserShield} /> {t("细粒度授权")}
         </button>
       </div>
     </div>

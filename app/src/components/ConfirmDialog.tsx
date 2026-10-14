@@ -1,3 +1,5 @@
+import { useI18n } from "../i18n";
+
 interface Props {
   title: string;
   message: string;
@@ -11,10 +13,11 @@ export function ConfirmDialog({
   title,
   message,
   danger,
-  confirmLabel = "确定",
+  confirmLabel,
   onConfirm,
   onCancel,
 }: Props) {
+  const { t } = useI18n();
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal modal--sm" onClick={(e) => e.stopPropagation()}>
@@ -26,14 +29,14 @@ export function ConfirmDialog({
         </div>
         <div className="modal__footer">
           <button className="btn" onClick={onCancel}>
-            取消
+            {t("取消")}
           </button>
           <button
             className={`btn ${danger ? "btn--danger" : "btn--primary"}`}
             onClick={onConfirm}
             autoFocus
           >
-            {confirmLabel}
+            {confirmLabel ?? t("确定")}
           </button>
         </div>
       </div>

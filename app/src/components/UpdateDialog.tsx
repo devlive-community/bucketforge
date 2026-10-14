@@ -5,6 +5,7 @@ import { faXmark, faCloudArrowDown } from "@fortawesome/free-solid-svg-icons";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { Update } from "../update";
+import { useI18n } from "../i18n";
 
 interface Props {
   update: Update;
@@ -13,6 +14,7 @@ interface Props {
 
 /** 发现新版本时的弹窗:展示版本与更新说明,下载并安装后自动重启。 */
 export function UpdateDialog({ update, onClose }: Props) {
+  const { t } = useI18n();
   const [phase, setPhase] = useState<"idle" | "downloading" | "error">("idle");
   const [pct, setPct] = useState(0);
   const [err, setErr] = useState("");
@@ -56,7 +58,7 @@ export function UpdateDialog({ update, onClose }: Props) {
     <div className="modal-backdrop" onClick={downloading ? undefined : onClose}>
       <div className="modal modal--update" onClick={(e) => e.stopPropagation()}>
         <div className="modal__header">
-          <h3>发现新版本</h3>
+          <h3>{t("发现新版本")}</h3>
           {!downloading && (
             <button className="modal__close" onClick={onClose}>
               <FontAwesomeIcon icon={faXmark} />
@@ -85,7 +87,7 @@ export function UpdateDialog({ update, onClose }: Props) {
               <div className="update__bar">
                 <div className="update__bar-fill" style={{ width: `${pct}%` }} />
               </div>
-              <span className="update__pct">下载中 {pct}%</span>
+              <span className="update__pct">{t("下载中 {pct}%", { pct })}</span>
             </div>
           )}
 
@@ -95,7 +97,7 @@ export function UpdateDialog({ update, onClose }: Props) {
         <div className="modal__footer">
           {!downloading && (
             <button className="btn" onClick={onClose}>
-              稍后
+              {t("稍后")}
             </button>
           )}
           <button
@@ -104,7 +106,12 @@ export function UpdateDialog({ update, onClose }: Props) {
             onClick={install}
           >
             <FontAwesomeIcon icon={faCloudArrowDown} />
-            {phase === "error" ? " 重试" : downloading ? " 更新中…" : " 立即更新"}
+            {" "}
+            {phase === "error"
+              ? t("重试")
+              : downloading
+                ? t("更新中…")
+                : t("立即更新")}
           </button>
         </div>
       </div>

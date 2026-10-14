@@ -953,17 +953,17 @@ export default function App() {
 
   // 检查更新:`manual` 为菜单手动触发(会给出"已是最新/失败"反馈);启动时静默检查。
   const runUpdateCheck = async (manual: boolean) => {
-    if (manual) setUpdateFlash("正在检查更新…");
+    if (manual) setUpdateFlash(t("正在检查更新…"));
     try {
       const found = await checkForUpdate();
       if (found) {
         setUpdate(found);
         if (manual) setUpdateFlash(null);
       } else if (manual) {
-        setUpdateFlash("当前已是最新版本");
+        setUpdateFlash(t("当前已是最新版本"));
       }
     } catch (e) {
-      if (manual) setUpdateFlash(`检查更新失败:${e}`);
+      if (manual) setUpdateFlash(t("检查更新失败:{err}", { err: String(e) }));
     }
   };
 
@@ -1184,7 +1184,7 @@ export default function App() {
 
   const batchDownload = async () => {
     if (!current || selected.size === 0) return;
-    const dir = await open({ directory: true, title: "选择下载到的文件夹" });
+    const dir = await open({ directory: true, title: t("选择下载到的文件夹") });
     if (typeof dir !== "string") return;
     setBusy(true);
     await runPool([...selected], settings.concurrency, (p) =>
@@ -1206,7 +1206,7 @@ export default function App() {
     if (!current || selected.size === 0) return;
     const paths = [...selected];
     setError(null);
-    setNotice({ tone: "info", text: `正在转换 ${paths.length} 个对象的存储类型…` });
+    setNotice({ tone: "info", text: t("正在转换 {n} 个对象的存储类型…", { n: paths.length }) });
     let ok = 0;
     let fail = 0;
     await runPool(paths, settings.concurrency, async (p) => {
@@ -1220,7 +1220,9 @@ export default function App() {
     clearSelection();
     setNotice({
       tone: fail ? "warn" : "ok",
-      text: `存储类型转换:成功 ${ok}${fail ? `,失败 ${fail}` : ""}`,
+      text: fail
+        ? t("存储类型转换:成功 {ok},失败 {fail}", { ok, fail })
+        : t("存储类型转换:成功 {ok}", { ok }),
     });
     await load();
   };
@@ -1230,7 +1232,7 @@ export default function App() {
     if (!current || selected.size === 0) return;
     const paths = [...selected];
     setError(null);
-    setNotice({ tone: "info", text: `正在发起取回 ${paths.length} 个对象…` });
+    setNotice({ tone: "info", text: t("正在发起取回 {n} 个对象…", { n: paths.length }) });
     let ok = 0;
     let fail = 0;
     await runPool(paths, settings.concurrency, async (p) => {
@@ -1244,7 +1246,9 @@ export default function App() {
     clearSelection();
     setNotice({
       tone: fail ? "warn" : "ok",
-      text: `已发起取回:成功 ${ok}${fail ? `,失败 ${fail}(可能非归档对象)` : ""}`,
+      text: fail
+        ? t("已发起取回:成功 {ok},失败 {fail}(可能非归档对象)", { ok, fail })
+        : t("已发起取回:成功 {ok}", { ok }),
     });
   };
 
@@ -1305,7 +1309,7 @@ export default function App() {
 
   const upload = async () => {
     if (!current || !path) return;
-    const sel = await open({ multiple: true, title: "选择要上传的文件" });
+    const sel = await open({ multiple: true, title: t("选择要上传的文件") });
     await uploadLocalPaths(toPathList(sel));
   };
 
@@ -1314,7 +1318,7 @@ export default function App() {
     const sel = await open({
       directory: true,
       multiple: true,
-      title: "选择要上传的文件夹",
+      title: t("选择要上传的文件夹"),
     });
     await uploadLocalPaths(toPathList(sel));
   };
@@ -1384,7 +1388,7 @@ export default function App() {
 
   const downloadFolderEntry = async (entry: Entry) => {
     if (!current) return;
-    const dir = await open({ directory: true, title: "选择下载到的目录" });
+    const dir = await open({ directory: true, title: t("选择下载到的目录") });
     if (typeof dir !== "string") return;
     await runFolderDownload(current, entry.path, dir, entry.name);
   };
@@ -1751,18 +1755,20 @@ export default function App() {
   const verifyEntry = async (entry: Entry) => {
     if (!current) return;
     setError(null);
-    setNotice({ tone: "info", text: `正在校验 ${entry.name}…` });
+    setNotice({ tone: "info", text: t("正在校验 {name}…", { name: entry.name }) });
     try {
       const r = await api.verifyObject(current, entry.path);
       if (r.status === "verified") {
-        setNotice({ tone: "ok", text: `✓ ${entry.name} 完整性校验通过` });
+        setNotice({ tone: "ok", text: t("✓ {name} 完整性校验通过", { name: entry.name }) });
       } else if (r.status === "mismatch") {
         setNotice({
           tone: "err",
-          text: `✗ ${entry.name} 校验失败:内容与远端 ETag 不一致,文件可能已损坏`,
+          text: t("✗ {name} 校验失败:内容与远端 ETag 不一致,文件可能已损坏", {
+            name: entry.name,
+          }),
         });
       } else {
-        setNotice({ tone: "warn", text: `${entry.name} 无法校验:${r.reason}` });
+        setNotice({ tone: "warn", text: t("{name} 无法校验:{reason}", { name: entry.name, reason: r.reason }) });
       }
     } catch (e) {
       setNotice(null);
@@ -1828,7 +1834,7 @@ export default function App() {
     setEditTypeTarget(null);
     if (!current || !entry) return;
     setError(null);
-    setNotice({ tone: "info", text: `正在修改 ${entry.name} 的类型…` });
+    setNotice({ tone: "info", text: t("正在修改 {name} 的类型…", { name: entry.name }) });
     try {
       await api.setContentType(current, entry.path, contentType);
       setDetailsEntry((cur) =>
@@ -1836,7 +1842,7 @@ export default function App() {
           ? { ...cur, content_type: contentType }
           : cur,
       );
-      setNotice({ tone: "ok", text: `✓ ${entry.name} 类型已改为 ${contentType}` });
+      setNotice({ tone: "ok", text: t("✓ {name} 类型已改为 {type}", { name: entry.name, type: contentType }) });
     } catch (e) {
       setNotice(null);
       setError(String(e));
@@ -1871,10 +1877,10 @@ export default function App() {
       );
       return;
     }
-    setNotice({ tone: "info", text: `正在转换 ${entry.name} 的存储类型…` });
+    setNotice({ tone: "info", text: t("正在转换 {name} 的存储类型…", { name: entry.name }) });
     try {
       await api.setStorageClass(current, entry.path, storageClass);
-      setNotice({ tone: "ok", text: `✓ ${entry.name} 已转为 ${storageClass}` });
+      setNotice({ tone: "ok", text: t("✓ {name} 已转为 {cls}", { name: entry.name, cls: storageClass }) });
       await load();
     } catch (e) {
       setNotice(null);
@@ -1896,12 +1902,12 @@ export default function App() {
       );
       return;
     }
-    setNotice({ tone: "info", text: `正在发起取回 ${entry.name}…` });
+    setNotice({ tone: "info", text: t("正在发起取回 {name}…", { name: entry.name }) });
     try {
       await api.restoreObject(current, entry.path, days);
       setNotice({
         tone: "ok",
-        text: `已发起取回 ${entry.name},解冻完成后即可下载`,
+        text: t("已发起取回 {name},解冻完成后即可下载", { name: entry.name }),
       });
     } catch (e) {
       setNotice(null);
@@ -1917,7 +1923,7 @@ export default function App() {
     try {
       await api.createBucket(current, name.trim());
       await load();
-      setNotice({ tone: "ok", text: `✓ 已新建 Bucket ${name.trim()}` });
+      setNotice({ tone: "ok", text: t("✓ 已新建 Bucket {name}", { name: name.trim() }) });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -2160,14 +2166,14 @@ export default function App() {
       <div
         className="resizer"
         onMouseDown={startResize}
-        title="拖拽调整宽度"
+        title={t("拖拽调整宽度")}
       />
 
       <main className="main">
         {dragOver && current && path !== "" && (
           <div className="drop-overlay">
             <FontAwesomeIcon icon={faCloudArrowUp} className="drop-overlay__icon" />
-            <span>松开以上传到当前目录(文件夹将递归上传)</span>
+            <span>{t("松开以上传到当前目录(文件夹将递归上传)")}</span>
           </div>
         )}
         {current ? (
@@ -2352,10 +2358,10 @@ export default function App() {
         ) : (
           <div className="empty-state">
             <Logo size={72} />
-            <h2>欢迎使用 BucketForge</h2>
-            <p>添加一个云账号开始管理你的对象存储</p>
+            <h2>{t("欢迎使用 BucketForge")}</h2>
+            <p>{t("添加一个云账号开始管理你的对象存储")}</p>
             <button className="btn btn--primary" onClick={() => setShowForm(true)}>
-              <FontAwesomeIcon icon={faPlus} /> 添加账号
+              <FontAwesomeIcon icon={faPlus} /> {t("添加账号")}
             </button>
           </div>
         )}
@@ -2701,7 +2707,7 @@ export default function App() {
       {batchStorageClass && current && (
         <StorageClassDialog
           vendor={accounts.find((a) => a.id === current)?.vendor ?? ""}
-          name={`已选 ${selected.size} 项`}
+          name={t("已选 {n} 项", { n: selected.size })}
           current={null}
           onConfirm={doBatchStorageClass}
           onCancel={() => setBatchStorageClass(false)}
@@ -2710,7 +2716,7 @@ export default function App() {
 
       {batchRestore && (
         <RestoreDialog
-          name={`已选 ${selected.size} 项`}
+          name={t("已选 {n} 项", { n: selected.size })}
           onConfirm={doBatchRestore}
           onCancel={() => setBatchRestore(false)}
         />

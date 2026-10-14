@@ -49,7 +49,7 @@ export function StatsDialog({ name, data, onClose }: Props) {
                           : 0;
                       return (
                         <tr key={c.class}>
-                          <td>{storageLabel(c.class)}</td>
+                          <td>{t(storageLabel(c.class))}</td>
                           <td>{c.files}</td>
                           <td>{formatBytes(c.bytes)}</td>
                           <td>
