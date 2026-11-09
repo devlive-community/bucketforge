@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { AccountInfo, Bookmark, CorsRule, Entry, ExifInfo, FolderStats, Grant, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry, WebsiteConfig } from "./types";
+import type { AccountInfo, Bookmark, CorsRule, DeleteFolderOutcome, DeleteSummary, Entry, ExifInfo, FolderStats, Grant, ImageData, ImageOps, IncompleteUpload, Integrity, LifecycleRule, ObjectVersion, Page, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, TextPreview, TransferItem, UploadEntry, WebsiteConfig } from "./types";
 
 /** 类型化的 Tauri command 封装。参数用 camelCase,Tauri 自动映射到 Rust 的 snake_case。 */
 
@@ -225,8 +225,25 @@ export const copyFolder = (
   transferId: string,
 ) => invoke<void>("copy_folder", { account, srcRoot, dstRoot, transferId });
 
-export const deleteFolder = (account: string, path: string) =>
-  invoke<void>("delete_folder", { account, path });
+export const deleteFolder = (
+  account: string,
+  path: string,
+  transferId: string,
+  allowUnbounded: boolean,
+) =>
+  invoke<DeleteFolderOutcome>("delete_folder", {
+    account,
+    path,
+    transferId,
+    allowUnbounded,
+  });
+
+/** 批量删除一组已勾选的对象路径。 */
+export const deletePaths = (
+  account: string,
+  paths: string[],
+  transferId: string,
+) => invoke<DeleteSummary>("delete_paths", { account, paths, transferId });
 
 /** 内容搜索:在文本 / PDF 文件里查关键字,返回命中文件与片段。 */
 export const searchContent = (

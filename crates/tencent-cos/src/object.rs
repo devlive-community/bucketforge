@@ -19,6 +19,14 @@ pub struct ObjectMeta {
     pub last_modified: Option<String>,
 }
 
+/// `DeleteMultipleObjects` 响应里某个 key 的失败项。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteObjectsError {
+    pub key: String,
+    pub code: String,
+    pub message: String,
+}
+
 /// COS 错误响应体(XML)。
 #[derive(Debug, Deserialize)]
 struct ErrorBody {
@@ -146,6 +154,43 @@ impl CosClient {
         })?;
         check_status(self.http().execute(request).await?).await?;
         Ok(())
+    }
+
+    /// 批量删除对象(`POST /?delete`),单次最多 1000 个 key。
+    ///
+    /// 返回失败项;成功项不在返回值里。`Quiet=true` 让服务端只回错误。
+    pub async fn delete_objects(
+        &self,
+        bucket: &str,
+        keys: &[String],
+    ) -> Result<Vec<DeleteObjectsError>> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        if keys.len() > 1000 {
+            return Err(CosError::Core(cloud_core::CoreError::InvalidRequest(
+                "DeleteMultipleObjects accepts at most 1000 keys".into(),
+            )));
+        }
+        let body = delete_objects_body(keys);
+        let content_md5 = cloud_core::crypto::content_md5(body.as_bytes());
+        let host = self.bucket_host(bucket);
+        let request = self.build_signed(SignSpec {
+            method: Method::POST,
+            host: &host,
+            uri_path: "/",
+            query: &[("delete", None)],
+            content_type: Some("application/xml"),
+            content_md5: Some(&content_md5),
+            cos_headers: &[],
+            body: Some(Bytes::from(body)),
+        })?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let text = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        if text.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        parse_delete_objects_errors(&text)
     }
 
     /// 读取对象元信息(HEAD)。
@@ -492,6 +537,46 @@ fn fallback_code(status: StatusCode) -> String {
         .replace(' ', "")
 }
 
+fn delete_objects_body(keys: &[String]) -> String {
+    let mut body = String::from("<Delete><Quiet>true</Quiet>");
+    for key in keys {
+        body.push_str("<Object><Key>");
+        body.push_str(&xml_escape(key));
+        body.push_str("</Key></Object>");
+    }
+    body.push_str("</Delete>");
+    body
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteResultXml {
+    #[serde(default, rename = "Error")]
+    errors: Vec<DeleteErrorXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteErrorXml {
+    key: String,
+    code: String,
+    message: String,
+}
+
+fn parse_delete_objects_errors(xml: &str) -> Result<Vec<DeleteObjectsError>> {
+    let doc: DeleteResultXml = quick_xml::de::from_str(xml)
+        .map_err(|e| CosError::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .errors
+        .into_iter()
+        .map(|e| DeleteObjectsError {
+            key: e.key,
+            code: e.code,
+            message: e.message,
+        })
+        .collect())
+}
+
 /// `GetObjectTagging` 响应体(XML)。
 #[derive(Debug, Deserialize)]
 struct Tagging {
@@ -591,5 +676,25 @@ mod tests {
         let parsed: ErrorBody = quick_xml::de::from_str(xml).unwrap();
         assert_eq!(parsed.code, "NoSuchKey");
         assert_eq!(parsed.request_id.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn delete_objects_body_escapes_keys_and_sets_quiet() {
+        let body = delete_objects_body(&["a&b".to_string(), "dir/c<d>".to_string()]);
+        assert!(body.starts_with("<Delete><Quiet>true</Quiet>"));
+        assert!(body.contains("<Key>a&amp;b</Key>"));
+        assert!(body.contains("<Key>dir/c&lt;d&gt;</Key>"));
+    }
+
+    #[test]
+    fn parses_delete_objects_errors() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<DeleteResult>
+  <Error><Key>a.txt</Key><Code>AccessDenied</Code><Message>denied</Message></Error>
+</DeleteResult>"#;
+        let errors = parse_delete_objects_errors(xml).unwrap();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].key, "a.txt");
+        assert_eq!(errors[0].code, "AccessDenied");
     }
 }

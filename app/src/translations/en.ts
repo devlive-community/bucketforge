@@ -378,6 +378,16 @@ export const EN: Record<string, string> = {
   已中断: "Interrupted",
   完成: "Done",
   已跳过: "Skipped",
+  "已删除 {n}": "Deleted {n}",
+  "{n} 个对象": "{n} objects",
+  "批量删除:成功 {ok},失败 {fail}": "Delete: {ok} ok, {fail} failed",
+  "删除文件夹:成功 {ok},失败 {fail}": "Delete folder: {ok} ok, {fail} failed",
+  "✓ 已删除 {n} 项": "✓ Deleted {n} item(s)",
+  "✓ 已删除 {name}": "✓ Deleted {name}",
+  "超过默认删除上限": "Delete limit exceeded",
+  "该文件夹至少有 {n} 个对象,超过默认上限 {limit}。继续将不设上限地递归删除,可能耗时较久,且不可恢复。":
+    "This folder contains at least {n} objects, above the default limit of {limit}. Continuing deletes recursively without a limit; it may take a while and cannot be undone.",
+  "继续删除": "Delete anyway",
   迁移: "Migrate",
   迁移文件夹: "Migrate folder",
   重命名文件夹: "Rename folder",
@@ -396,6 +406,8 @@ export const EN: Record<string, string> = {
   下载文件夹: "Download folder",
   删除文件夹: "Delete folder",
   "删除 Bucket": "Delete bucket",
+  "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。若桶启用了版本控制,历史版本仍会保留。":
+    "Delete the entire folder {name}? All objects underneath will be deleted recursively and this cannot be undone. If bucket versioning is enabled, historical versions remain.",
 
   // 设置对话框
   "分享链接有效期(分钟)": "Share link expiry (minutes)",

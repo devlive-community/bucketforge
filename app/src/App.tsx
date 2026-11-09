@@ -7,6 +7,7 @@ import { faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type {
   AccountInfo,
   Bookmark,
+  DeleteProgress,
   DownloadProgress,
   Entry,
   RenamePlan,
@@ -161,6 +162,12 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [editInfo, setEditInfo] = useState<AccountInfo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [pendingUnboundedDelete, setPendingUnboundedDelete] = useState<{
+    account: string;
+    path: string;
+    limit: number;
+    atLeast: number;
+  } | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<Entry | null>(null);
@@ -699,6 +706,10 @@ export default function App() {
       const { op, path, done, total } = e.payload;
       updateProgress(`folder:${op}:${path}`, done, total);
     });
+    const unDelete = listen<DeleteProgress>("delete-progress", (e) => {
+      const { id, done, total } = e.payload;
+      updateProgress(id, done, total);
+    });
     // 定时同步现在完全由 Rust 后端调度(见 sync_scheduler.rs);这里只接收它跑完后的
     // 通知,空跑(没有任何上传/下载/删除且没失败)不会收到这个事件。
     const unSyncJob = listen<SyncJobFinished>("sync-job-finished", (e) => {
@@ -716,6 +727,7 @@ export default function App() {
       unDownload.then((off) => off());
       unTransfer.then((off) => off());
       unFolder.then((off) => off());
+      unDelete.then((off) => off());
       unSyncJob.then((off) => off());
     };
   }, []);
@@ -1113,21 +1125,66 @@ export default function App() {
   const doBatchDelete = async () => {
     setPendingBatchDelete(false);
     if (!current || selected.size === 0) return;
-    setBusy(true);
     setError(null);
-    const deleted = new Set(selected);
+    const paths = [...selected];
+    const id = `delete:batch:${Date.now()}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [id]: {
+        id,
+        kind: "批量删除",
+        name: t("{n} 个对象", { n: paths.length }),
+        account: current,
+        remote: "",
+        local: "",
+        done: 0,
+        total: paths.length,
+        status: "active",
+      },
+    }));
     try {
-      for (const p of deleted) await api.deletePath(current, p);
-      clearSelection();
-      // 搜索视图里把已删的命中去掉,避免残留。
-      setSearch((s) =>
-        s ? { ...s, results: s.results.filter((r) => !deleted.has(r.path)) } : s,
+      const summary = await api.deletePaths(current, paths, id);
+      const status = summary.cancelled ? "cancelled" : summary.failed ? "error" : "done";
+      setTransfers((prev) =>
+        prev[id]
+          ? {
+              ...prev,
+              [id]: {
+                ...prev[id],
+                status,
+                done: summary.deleted + summary.failed,
+              },
+            }
+          : prev,
       );
+      if (summary.failed > 0) {
+        setNotice({
+          tone: "warn",
+          text: t("批量删除:成功 {ok},失败 {fail}", {
+            ok: summary.deleted,
+            fail: summary.failed,
+          }),
+        });
+      } else if (!summary.cancelled) {
+        setNotice({
+          tone: "ok",
+          text: t("✓ 已删除 {n} 项", { n: summary.deleted }),
+        });
+      }
+      // 只有全部成功才清空选择;部分失败时保留勾选,便于用户重试。
+      if (!summary.cancelled && summary.failed === 0) {
+        const deleted = new Set(paths);
+        clearSelection();
+        setSearch((s) =>
+          s ? { ...s, results: s.results.filter((r) => !deleted.has(r.path)) } : s,
+        );
+      }
       await load();
     } catch (e) {
       setError(String(e));
-    } finally {
-      setBusy(false);
+      setTransfers((prev) =>
+        prev[id] ? { ...prev, [id]: { ...prev[id], status: "error" } } : prev,
+      );
     }
   };
 
@@ -1393,18 +1450,110 @@ export default function App() {
     await runFolderDownload(current, entry.path, dir, entry.name);
   };
 
+  const runDeleteFolder = async (
+    account: string,
+    path: string,
+    allowUnbounded: boolean,
+    transferId: string,
+  ) => {
+    setError(null);
+    setTransfers((prev) => ({
+      ...prev,
+      [transferId]: {
+        id: transferId,
+        kind: "删除文件夹",
+        name: baseName(path),
+        account,
+        remote: path,
+        local: "",
+        done: 0,
+        total: 0,
+        status: "active",
+      },
+    }));
+    try {
+      const outcome = await api.deleteFolder(
+        account,
+        path,
+        transferId,
+        allowUnbounded,
+      );
+      if (outcome.status === "limit_exceeded") {
+        // 探测阶段没有删除任何对象;移除临时进度项,等用户二次确认。
+        setTransfers((prev) => {
+          const next = { ...prev };
+          delete next[transferId];
+          return next;
+        });
+        setPendingUnboundedDelete({
+          account,
+          path,
+          limit: outcome.limit,
+          atLeast: outcome.at_least,
+        });
+        return;
+      }
+      const summary = outcome.summary;
+      const status = summary.cancelled ? "cancelled" : summary.failed ? "error" : "done";
+      setTransfers((prev) =>
+        prev[transferId]
+          ? {
+              ...prev,
+              [transferId]: {
+                ...prev[transferId],
+                status,
+                done: summary.deleted + summary.failed,
+              },
+            }
+          : prev,
+      );
+      if (summary.failed > 0) {
+        setNotice({
+          tone: "warn",
+          text: t("删除文件夹:成功 {ok},失败 {fail}", {
+            ok: summary.deleted,
+            fail: summary.failed,
+          }),
+        });
+      } else if (!summary.cancelled) {
+        setNotice({
+          tone: "ok",
+          text: t("✓ 已删除 {name}", { name: baseName(path) }),
+        });
+      }
+      if (account === current) await load();
+    } catch (e) {
+      setError(String(e));
+      setTransfers((prev) =>
+        prev[transferId]
+          ? { ...prev, [transferId]: { ...prev[transferId], status: "error" } }
+          : prev,
+      );
+    }
+  };
+
   const doDelete = async () => {
     const entry = pendingDelete;
     setPendingDelete(null);
     if (!current || !entry) return;
-    setBusy(true);
     setError(null);
     try {
-      if (isBucket(entry)) await api.deleteBucket(current, entry.path);
-      else if (entry.kind === "directory")
-        await api.deleteFolder(current, entry.path);
-      else await api.deletePath(current, entry.path);
-      await load();
+      if (isBucket(entry)) {
+        setBusy(true);
+        await api.deleteBucket(current, entry.path);
+        await load();
+      } else if (entry.kind === "directory") {
+        await runDeleteFolder(
+          current,
+          entry.path,
+          false,
+          `delete:folder:${Date.now()}`,
+        );
+      } else {
+        setBusy(true);
+        await api.deletePath(current, entry.path);
+        await load();
+      }
     } catch (e) {
       setError(String(e));
     } finally {
@@ -1974,6 +2123,7 @@ export default function App() {
     !!versionsTarget ||
     !!statsTarget ||
     !!cleanupTarget ||
+    !!pendingUnboundedDelete ||
     pendingBatchDelete ||
     showPalette ||
     showSettings;
@@ -2020,6 +2170,7 @@ export default function App() {
         setStatsData(null);
       } else if (cleanupTarget) setCleanupTarget(null);
       else if (showForm) setShowForm(false);
+      else if (pendingUnboundedDelete) setPendingUnboundedDelete(null);
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
       else if (detailsEntry) setDetailsEntry(null);
@@ -2399,7 +2550,7 @@ export default function App() {
                 })
               : pendingDelete.kind === "directory"
                 ? t(
-                    "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。",
+                    "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。若桶启用了版本控制,历史版本仍会保留。",
                     { name: pendingDelete.name },
                   )
                 : t("确定删除 {name}?此操作不可恢复。", {
@@ -2410,6 +2561,32 @@ export default function App() {
           confirmLabel={t("删除")}
           onConfirm={doDelete}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingUnboundedDelete && (
+        <ConfirmDialog
+          title={t("超过默认删除上限")}
+          message={t(
+            "该文件夹至少有 {n} 个对象,超过默认上限 {limit}。继续将不设上限地递归删除,可能耗时较久,且不可恢复。",
+            {
+              n: pendingUnboundedDelete.atLeast,
+              limit: pendingUnboundedDelete.limit,
+            },
+          )}
+          danger
+          confirmLabel={t("继续删除")}
+          onConfirm={() => {
+            const target = pendingUnboundedDelete;
+            setPendingUnboundedDelete(null);
+            void runDeleteFolder(
+              target.account,
+              target.path,
+              true,
+              `delete:folder:${Date.now()}`,
+            );
+          }}
+          onCancel={() => setPendingUnboundedDelete(null)}
         />
       )}
 

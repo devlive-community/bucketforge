@@ -9,8 +9,9 @@ use futures::StreamExt;
 
 use aws_s3::{AclGrant, ListEntry, S3Client, S3Error};
 use bucketforge_provider::{
-    path, ByteStream, Capabilities, CorsRule, Entry, Grant, IncompleteUpload, LifecycleRule,
-    ObjectVersion, Permission, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
+    path, ByteStream, Capabilities, CorsRule, DeleteItemResult, Entry, Grant, IncompleteUpload,
+    LifecycleRule, ObjectVersion, Permission, ProgressFn, ProviderError, Result, StorageProvider,
+    WebsiteConfig,
 };
 
 /// 把 SDK 的授权条目映射到统一 provider 模型;权限字符串未知(理论上不会发生,SDK 只会
@@ -634,6 +635,14 @@ impl StorageProvider for AwsProvider {
             .delete_object(bucket, key)
             .await
             .map_err(map_err)
+    }
+
+    fn max_delete_batch(&self) -> usize {
+        1000
+    }
+
+    async fn delete_batch(&self, paths: &[String]) -> Vec<DeleteItemResult> {
+        bucketforge_provider::delete_batch_multi!(self.client, paths)
     }
 
     async fn copy(&self, from: &str, to: &str) -> Result<()> {

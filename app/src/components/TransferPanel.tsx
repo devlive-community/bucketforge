@@ -6,6 +6,8 @@ import { useI18n } from "../i18n";
 
 /** 进度以字节计的传输种类(可显示速度 / ETA);文件夹类以文件数计,不显示。 */
 const BYTE_KINDS = new Set(["上传", "下载", "迁移"]);
+/** 删除类任务的总数可能未知(显式无上限),进度只显示已删除数量。 */
+const DELETE_KINDS = new Set(["删除文件夹", "批量删除"]);
 
 /** 失败(可再跑)的状态。 */
 const FAILED = new Set(["error", "cancelled", "interrupted"]);
@@ -81,6 +83,8 @@ export function TransferPanel({ items, onClear, onRetry, onCancel }: Props) {
               const eta = formatDuration((i.total - i.done) / speed);
               if (eta) active += ` · ~${eta}`;
             }
+          } else if (DELETE_KINDS.has(i.kind) && i.total === 0) {
+            active = t("已删除 {n}", { n: i.done });
           }
           const retryable = isRetryable(i);
           const label =

@@ -15,6 +15,7 @@
 
 pub mod capabilities;
 pub mod cors;
+pub mod delete;
 pub mod entry;
 pub mod error;
 pub mod grant;
@@ -27,6 +28,7 @@ pub mod website;
 
 pub use capabilities::Capabilities;
 pub use cors::CorsRule;
+pub use delete::DeleteItemResult;
 pub use entry::{Entry, EntryKind};
 pub use error::{ProviderError, Result};
 pub use grant::{Grant, Permission};

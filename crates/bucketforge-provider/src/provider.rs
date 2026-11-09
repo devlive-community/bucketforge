@@ -8,6 +8,7 @@ use futures::Stream;
 
 use crate::capabilities::Capabilities;
 use crate::cors::CorsRule;
+use crate::delete::DeleteItemResult;
 use crate::entry::Entry;
 use crate::error::{ProviderError, Result};
 use crate::grant::Grant;
@@ -340,6 +341,29 @@ pub trait StorageProvider: Send + Sync {
 
     /// 删除单个对象。
     async fn delete(&self, path: &str) -> Result<()>;
+
+    /// 单次批量删除请求最多包含多少个对象;`1` 表示只支持单对象删除。
+    ///
+    /// 上层按此值切批,并用设置里的并发度控制同时进行的批次数。支持原生多对象删除的
+    /// 适配层覆盖此方法并在 [`delete_batch`](Self::delete_batch) 里实现真正的批量请求。
+    fn max_delete_batch(&self) -> usize {
+        1
+    }
+
+    /// 删除一批对象(最多 [`max_delete_batch`](Self::max_delete_batch) 个)。
+    ///
+    /// 默认实现逐个调用 [`delete`](Self::delete),把所有失败收集进返回值而不是中止整批;
+    /// 这是所有 provider 都能工作的回退路径。原生批量接口由适配层覆盖。
+    async fn delete_batch(&self, paths: &[String]) -> Vec<DeleteItemResult> {
+        let mut results = Vec::with_capacity(paths.len());
+        for path in paths {
+            match self.delete(path).await {
+                Ok(()) => results.push(DeleteItemResult::deleted(path.clone())),
+                Err(e) => results.push(DeleteItemResult::failed(path.clone(), e.to_string())),
+            }
+        }
+        results
+    }
 
     /// 复制对象。默认实现下载再上传;支持服务端复制的适配层应覆盖以提升效率。
     async fn copy(&self, from: &str, to: &str) -> Result<()> {

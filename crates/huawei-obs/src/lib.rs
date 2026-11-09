@@ -27,4 +27,4 @@ pub mod sign;
 pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary, ObjectVersion};
 pub use client::ObsClient;
 pub use error::{ObsError, Result};
-pub use object::ObjectMeta;
+pub use object::{DeleteObjectsError, ObjectMeta};

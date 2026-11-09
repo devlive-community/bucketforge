@@ -24,6 +24,14 @@ pub struct ObjectMeta {
     pub last_modified: Option<String>,
 }
 
+/// `DeleteObjects` 响应里某个 key 的失败项。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteObjectsError {
+    pub key: String,
+    pub code: String,
+    pub message: String,
+}
+
 /// 一条对象授权:被授权账号的 canonical ID + 权限(`READ`/`WRITE`/`READ_ACP`/`WRITE_ACP`/
 /// `FULL_CONTROL` 官方原始字符串,由上层 provider 适配层映射成自己的枚举)。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -170,6 +178,47 @@ pub(crate) fn xml_escape(s: &str) -> String {
     out
 }
 
+/// `DeleteObjects` 的请求体。`Quiet=true` 时服务端只返回失败项。
+fn delete_objects_body(keys: &[String]) -> String {
+    let mut body = String::from("<Delete><Quiet>true</Quiet>");
+    for key in keys {
+        body.push_str("<Object><Key>");
+        body.push_str(&xml_escape(key));
+        body.push_str("</Key></Object>");
+    }
+    body.push_str("</Delete>");
+    body
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteResultXml {
+    #[serde(default, rename = "Error")]
+    errors: Vec<DeleteErrorXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteErrorXml {
+    key: String,
+    code: String,
+    message: String,
+}
+
+fn parse_delete_objects_errors(xml: &str) -> Result<Vec<DeleteObjectsError>> {
+    let doc: DeleteResultXml = quick_xml::de::from_str(xml)
+        .map_err(|e| S3Error::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .errors
+        .into_iter()
+        .map(|e| DeleteObjectsError {
+            key: e.key,
+            code: e.code,
+            message: e.message,
+        })
+        .collect())
+}
+
 /// S3 错误响应体(XML)。
 #[derive(Debug, Deserialize)]
 struct ErrorBody {
@@ -280,6 +329,46 @@ impl S3Client {
         })?;
         check_status(self.http().execute(request).await?).await?;
         Ok(())
+    }
+
+    /// 批量删除对象(`POST /{bucket}?delete`),单次最多 1000 个 key。
+    ///
+    /// 返回**失败项**;成功项不在返回值里。使用 `Quiet=true` 让服务端只回错误,避免
+    /// 大目录删除时把每个成功 key 都塞进响应体。对象不存在仍视为成功(S3 语义)。
+    pub async fn delete_objects(
+        &self,
+        bucket: &str,
+        keys: &[String],
+    ) -> Result<Vec<DeleteObjectsError>> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        if keys.len() > 1000 {
+            return Err(S3Error::Core(cloud_core::CoreError::InvalidRequest(
+                "DeleteObjects accepts at most 1000 keys".into(),
+            )));
+        }
+        let body = delete_objects_body(keys);
+        let content_md5 = cloud_core::crypto::content_md5(body.as_bytes());
+        let canonical_uri = format!("/{bucket}");
+        let query = [("delete".to_string(), String::new())];
+        let resp = check_status(
+            self.send(RequestSpec {
+                method: Method::POST,
+                canonical_uri: &canonical_uri,
+                query: &query,
+                content_type: Some("application/xml"),
+                amz_headers: &[("content-md5", content_md5)],
+                body: Some(Bytes::from(body)),
+            })
+            .await?,
+        )
+        .await?;
+        let text = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        if text.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        parse_delete_objects_errors(&text)
     }
 
     /// 读取对象元信息(HEAD)。
@@ -871,5 +960,51 @@ mod tests {
         let parsed: ErrorBody = quick_xml::de::from_str(xml).unwrap();
         assert_eq!(parsed.code, "NoSuchKey");
         assert_eq!(parsed.request_id.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn delete_objects_body_escapes_keys_and_sets_quiet() {
+        let body = delete_objects_body(&["a&b".to_string(), "dir/c<d>".to_string()]);
+        assert!(body.starts_with("<Delete><Quiet>true</Quiet>"));
+        assert!(body.contains("<Key>a&amp;b</Key>"));
+        assert!(body.contains("<Key>dir/c&lt;d&gt;</Key>"));
+    }
+
+    #[test]
+    fn parses_delete_objects_errors() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<DeleteResult>
+  <Error><Key>a.txt</Key><Code>AccessDenied</Code><Message>denied</Message></Error>
+  <Error><Key>dir/b.txt</Key><Code>InternalError</Code><Message>boom</Message></Error>
+</DeleteResult>"#;
+        let errors = parse_delete_objects_errors(xml).unwrap();
+        assert_eq!(errors.len(), 2);
+        assert_eq!(errors[0].key, "a.txt");
+        assert_eq!(errors[1].code, "InternalError");
+    }
+
+    #[test]
+    fn delete_objects_request_signs_delete_subresource_and_content_md5() {
+        let c = client();
+        let keys = vec!["a.txt".to_string()];
+        let body = delete_objects_body(&keys);
+        let md5 = cloud_core::crypto::content_md5(body.as_bytes());
+        let canonical_uri = "/bkt";
+        let query = [("delete".to_string(), String::new())];
+        let req = c
+            .build_signed(RequestSpec {
+                method: Method::POST,
+                canonical_uri,
+                query: &query,
+                content_type: Some("application/xml"),
+                amz_headers: &[("content-md5", md5.clone())],
+                body: Some(Bytes::from(body)),
+            })
+            .unwrap();
+        assert!(req.url().as_str().contains("?delete"));
+        assert_eq!(
+            req.headers().get("content-md5").unwrap().to_str().unwrap(),
+            md5
+        );
     }
 }

@@ -145,6 +145,16 @@ struct FolderProgress {
     total: u64,
 }
 
+/// 批量删除进度事件负载,发往前端 `delete-progress`。`total = 0` 表示无上限流式删除,
+/// 前端只展示已删除数量。
+#[derive(Clone, Serialize)]
+struct DeleteProgress {
+    /// 前端创建的传输任务 id,用于定位进度条。
+    id: String,
+    done: u64,
+    total: u64,
+}
+
 /// 列出已注册账号(仅 id)。
 #[tauri::command]
 fn list_accounts(state: State<'_, App>) -> Vec<String> {
@@ -1471,28 +1481,70 @@ async fn copy_folder(
         })
 }
 
-/// 递归删除整个远端文件夹(文件 + 目录占位)。每删一个发一次 `folder-progress`。
+/// 递归删除整个远端文件夹(文件 + 目录占位)。
+///
+/// 默认在 20,000 条处 fail-closed;`allow_unbounded = true` 时由用户显式选择流式无上限删除。
+/// 通过 `delete-progress` 汇报进度,`transfer_id` 同时用于取消。
 #[tauri::command]
 async fn delete_folder(
     app: AppHandle,
     state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
     account: String,
     path: String,
-) -> Result<(), String> {
+    allow_unbounded: bool,
+) -> Result<app_core::DeleteFolderOutcome, String> {
     let core = state.inner().clone();
-    let event_path = path.clone();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
+    let event_id = transfer_id.clone();
     let progress = move |done: u64, total: u64| {
         let _ = app.emit(
-            "folder-progress",
-            FolderProgress {
-                op: "delete".into(),
-                path: event_path.clone(),
+            "delete-progress",
+            DeleteProgress {
+                id: event_id.clone(),
                 done,
                 total,
             },
         );
     };
-    core.delete_folder(&account, &path, &progress)
+    core.delete_folder(&account, &path, allow_unbounded, cancel, &progress)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 批量删除多选对象。用户显式勾选,不再套用 20,000 条递归遍历上限。
+#[tauri::command]
+async fn delete_paths(
+    app: AppHandle,
+    state: State<'_, App>,
+    transfers: State<'_, Transfers>,
+    transfer_id: String,
+    account: String,
+    paths: Vec<String>,
+) -> Result<app_core::DeleteSummary, String> {
+    let core = state.inner().clone();
+    let cancel = transfers.begin(&transfer_id);
+    let _guard = CancelGuard {
+        transfers: transfers.inner(),
+        id: transfer_id.clone(),
+    };
+    let event_id = transfer_id.clone();
+    let progress = move |done: u64, total: u64| {
+        let _ = app.emit(
+            "delete-progress",
+            DeleteProgress {
+                id: event_id.clone(),
+                done,
+                total,
+            },
+        );
+    };
+    core.delete_paths(&account, &paths, cancel, &progress)
         .await
         .map_err(|e| e.to_string())
 }
@@ -2214,6 +2266,7 @@ pub fn run() {
             upload_file,
             download_file,
             delete,
+            delete_paths,
             create_folder,
             create_bucket,
             delete_bucket,

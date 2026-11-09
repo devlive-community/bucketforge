@@ -23,4 +23,4 @@ pub mod sign;
 pub use bucket::{BucketSummary, LifecycleRule, ListEntry, ObjectSummary, ObjectVersion};
 pub use client::OssClient;
 pub use error::{OssError, Result};
-pub use object::ObjectMeta;
+pub use object::{DeleteObjectsError, ObjectMeta};

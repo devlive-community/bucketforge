@@ -31,6 +31,32 @@ export interface FolderProgress {
   total: number;
 }
 
+/** 批量删除进度事件负载(Rust 端 DeleteProgress)。`total = 0` 表示总数未知。 */
+export interface DeleteProgress {
+  id: string;
+  done: number;
+  total: number;
+}
+
+/** 单个对象的删除失败(与 app_core::DeleteFailure 对应)。 */
+export interface DeleteFailure {
+  path: string;
+  error: string;
+}
+
+/** 一次批量删除的结果摘要(与 app_core::DeleteSummary 对应)。 */
+export interface DeleteSummary {
+  deleted: number;
+  failed: number;
+  errors: DeleteFailure[];
+  cancelled: boolean;
+}
+
+/** 递归删除结果:完成或超过默认 20,000 条上限(与 app_core::DeleteFolderOutcome 对应)。 */
+export type DeleteFolderOutcome =
+  | { status: "deleted"; summary: DeleteSummary }
+  | { status: "limit_exceeded"; limit: number; at_least: number };
+
 /** 后台调度器自动触发的同步任务跑完事件负载(Rust 端 SyncJobFinished)。只在真的
  * 做了事或失败时才发,空跑不打扰用户。 */
 export interface SyncJobFinished {
@@ -282,6 +308,8 @@ export interface TransferItem {
     | "重命名文件夹"
     | "移动文件夹"
     | "复制文件夹"
+    | "删除文件夹"
+    | "批量删除"
     | "转换存储类型"
     | "取回归档";
   name: string;

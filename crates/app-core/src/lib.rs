@@ -12,6 +12,7 @@ mod cancel;
 mod content_search;
 mod content_type;
 mod dedup;
+mod delete;
 mod duplicates;
 mod error;
 mod imaging;
@@ -59,6 +60,7 @@ pub use bucketforge_provider::{
     ObjectVersion, Page, Permission, ProgressFn, WebsiteConfig,
 };
 pub use content_search::{ContentHit, ContentSearchResult};
+pub use delete::{DeleteFailure, DeleteFolderOutcome, DeleteSummary};
 pub use duplicates::{DupGroup, DupResult};
 pub use error::{AppError, Result};
 pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
@@ -1179,6 +1181,35 @@ impl App {
         Ok(self.provider(account)?.delete(path).await?)
     }
 
+    /// 批量删除一组对象路径(多选删除)。
+    ///
+    /// 不设 20,000 条遍历上限:路径集合已经是用户显式勾选的结果。单个对象失败不会中止
+    /// 整批,最终以 [`DeleteSummary`] 返回;`cancel` 置位后不再调度新批次。
+    pub async fn delete_paths(
+        &self,
+        account: &str,
+        paths: &[String],
+        cancel: Arc<AtomicBool>,
+        progress: ProgressFn<'_>,
+    ) -> Result<DeleteSummary> {
+        let provider = self.provider(account)?;
+        Ok(delete::run_delete_batches(
+            provider,
+            paths.to_vec(),
+            Some(paths.len() as u64),
+            0,
+            self.delete_concurrency(),
+            cancel,
+            progress,
+        )
+        .await)
+    }
+
+    /// 删除操作的并发批次数,复用传输并发设置(1–10)。
+    fn delete_concurrency(&self) -> usize {
+        self.settings().concurrency.clamp(1, 10) as usize
+    }
+
     /// 重命名 / 移动对象。
     pub async fn rename(&self, account: &str, from: &str, to: &str) -> Result<()> {
         Ok(self.provider(account)?.rename(from, to).await?)
@@ -1787,33 +1818,29 @@ impl App {
         Ok(())
     }
 
-    /// 递归删除 `root` 下所有对象(文件 + 目录占位对象)。`progress(已删数, 总数)`。
+    /// 递归删除 `root` 下所有对象(文件 + 目录占位对象)。
     ///
-    /// 对象存储的 DELETE 是幂等的,合成前缀(无实体占位对象)删除也安全,故一并清理目录占位,
-    /// 避免"新建文件夹"留下的零字节 `/` 对象残留。
+    /// 默认先扫描到 [`SEARCH_SCAN_LIMIT`] 条;超过时不删除任何对象,返回
+    /// [`DeleteFolderOutcome::LimitExceeded`],由上层二次确认后以 `allow_unbounded = true`
+    /// 重新发起流式删除。文件删除有任一失败或取消时保留目录占位对象。
     pub async fn delete_folder(
         &self,
         account: &str,
         root: &str,
+        allow_unbounded: bool,
+        cancel: Arc<AtomicBool>,
         progress: ProgressFn<'_>,
-    ) -> Result<()> {
+    ) -> Result<DeleteFolderOutcome> {
         let provider = self.provider(account)?;
-        let (files, mut dirs) = walk_dir(&provider, root).await?;
-        dirs.push(ensure_trailing_slash(root));
-        dirs.sort_by_key(|b| std::cmp::Reverse(b.len())); // 深的先删
-        let total = (files.len() + dirs.len()) as u64;
-        let mut done = 0u64;
-        for file in &files {
-            provider.delete(&file.path).await?;
-            done += 1;
-            progress(done, total);
-        }
-        for dir in &dirs {
-            provider.delete(dir).await?;
-            done += 1;
-            progress(done, total);
-        }
-        Ok(())
+        delete::delete_folder(
+            provider,
+            root,
+            allow_unbounded,
+            self.delete_concurrency(),
+            cancel,
+            progress,
+        )
+        .await
     }
 
     /// 把 `root` 下所有文件递归转换到存储类型 `class`(如整个前缀转归档省钱)。
@@ -2287,6 +2314,7 @@ mod tests {
         deleted: Mutex<Vec<String>>,
         classed: Mutex<Vec<(String, String)>>,
         restored: Mutex<Vec<(String, u32)>>,
+        fail_delete: Mutex<Option<String>>,
     }
 
     impl RecordingTree {
@@ -2296,6 +2324,7 @@ mod tests {
                 deleted: Mutex::new(Vec::new()),
                 classed: Mutex::new(Vec::new()),
                 restored: Mutex::new(Vec::new()),
+                fail_delete: Mutex::new(None),
             }
         }
     }
@@ -2341,6 +2370,9 @@ mod tests {
             Ok(())
         }
         async fn delete(&self, path: &str) -> bucketforge_provider::Result<()> {
+            if self.fail_delete.lock().unwrap().as_deref() == Some(path) {
+                return Err(ProviderError::Backend("boom".into()));
+            }
             self.deleted.lock().unwrap().push(path.to_string());
             Ok(())
         }
@@ -2357,6 +2389,57 @@ mod tests {
         }
         async fn restore(&self, path: &str, days: u32) -> bucketforge_provider::Result<()> {
             self.restored.lock().unwrap().push((path.to_string(), days));
+            Ok(())
+        }
+    }
+
+    /// 在单个目录下生成大量文件的 provider,用于验证 20k fail-closed 与无上限流式删除。
+    struct BulkTree {
+        count: usize,
+        deleted: Mutex<usize>,
+    }
+
+    impl BulkTree {
+        fn new(count: usize) -> Self {
+            Self {
+                count,
+                deleted: Mutex::new(0),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl StorageProvider for BulkTree {
+        fn id(&self) -> &str {
+            "bulk"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+        async fn list(&self, path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
+            if path != "b" {
+                return Ok(Vec::new());
+            }
+            Ok((0..self.count)
+                .map(|index| Entry::file(format!("b/f{index:05}.txt"), 1))
+                .collect())
+        }
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
+            Ok(Entry::file(path.to_string(), 1))
+        }
+        async fn read(&self, _path: &str) -> bucketforge_provider::Result<Bytes> {
+            Ok(Bytes::new())
+        }
+        async fn write(
+            &self,
+            _path: &str,
+            _data: Bytes,
+            _ct: Option<&str>,
+        ) -> bucketforge_provider::Result<()> {
+            Ok(())
+        }
+        async fn delete(&self, _path: &str) -> bucketforge_provider::Result<()> {
+            *self.deleted.lock().unwrap() += 1;
             Ok(())
         }
     }
@@ -2566,14 +2649,177 @@ mod tests {
         let rec = Arc::new(RecordingTree::new());
         app.add_account(rec.clone());
 
-        app.delete_folder("rec", "b/photos", &|_, _| {})
+        let outcome = app
+            .delete_folder(
+                "rec",
+                "b/photos",
+                false,
+                Arc::new(AtomicBool::new(false)),
+                &|_, _| {},
+            )
             .await
             .unwrap();
+        let summary = match outcome {
+            DeleteFolderOutcome::Deleted { summary } => summary,
+            other => panic!("expected deleted outcome, got {other:?}"),
+        };
+        assert_eq!(summary.deleted, 3);
+        assert_eq!(summary.failed, 0);
         let deleted = rec.deleted.lock().unwrap().clone();
         assert!(deleted.contains(&"b/photos/cat.jpg".to_string()));
         assert!(deleted.contains(&"b/photos/dog.png".to_string()));
         // 目录占位对象也被清掉。
         assert!(deleted.contains(&"b/photos/".to_string()));
+    }
+
+    #[tokio::test]
+    async fn delete_folder_keeps_dir_marker_when_a_file_fails() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        *rec.fail_delete.lock().unwrap() = Some("b/photos/cat.jpg".to_string());
+        app.add_account(rec.clone());
+
+        let outcome = app
+            .delete_folder(
+                "rec",
+                "b/photos",
+                false,
+                Arc::new(AtomicBool::new(false)),
+                &|_, _| {},
+            )
+            .await
+            .unwrap();
+        let summary = match outcome {
+            DeleteFolderOutcome::Deleted { summary } => summary,
+            other => panic!("expected deleted outcome, got {other:?}"),
+        };
+        assert_eq!(summary.deleted, 1);
+        assert_eq!(summary.failed, 1);
+        assert_eq!(summary.errors[0].path, "b/photos/cat.jpg");
+
+        let deleted = rec.deleted.lock().unwrap().clone();
+        assert!(deleted.contains(&"b/photos/dog.png".to_string()));
+        assert!(!deleted.contains(&"b/photos/".to_string()));
+    }
+
+    #[tokio::test]
+    async fn delete_folder_limit_exceeded_deletes_nothing() {
+        let app = App::new();
+        let bulk = Arc::new(BulkTree::new(SEARCH_SCAN_LIMIT + 1));
+        app.add_account(bulk.clone());
+
+        let outcome = app
+            .delete_folder(
+                "bulk",
+                "b",
+                false,
+                Arc::new(AtomicBool::new(false)),
+                &|_, _| {},
+            )
+            .await
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            DeleteFolderOutcome::LimitExceeded { limit, at_least }
+                if limit == SEARCH_SCAN_LIMIT && at_least == SEARCH_SCAN_LIMIT + 1
+        ));
+        assert_eq!(*bulk.deleted.lock().unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn delete_folder_unbounded_deletes_all_objects_and_marker() {
+        let app = App::new();
+        let bulk = Arc::new(BulkTree::new(5));
+        app.add_account(bulk.clone());
+
+        let outcome = app
+            .delete_folder(
+                "bulk",
+                "b",
+                true,
+                Arc::new(AtomicBool::new(false)),
+                &|_, _| {},
+            )
+            .await
+            .unwrap();
+        let summary = match outcome {
+            DeleteFolderOutcome::Deleted { summary } => summary,
+            other => panic!("expected deleted outcome, got {other:?}"),
+        };
+        assert_eq!(summary.deleted, 6);
+        assert_eq!(*bulk.deleted.lock().unwrap(), 6);
+    }
+
+    /// 有些厂商把以 `/` 结尾的目录标记当作普通对象返回;它必须归入目录阶段,
+    /// 不能因为同目录下某个文件删除失败就被提前删掉。
+    struct MarkerTree {
+        deleted: Mutex<Vec<String>>,
+        fail: Mutex<Option<String>>,
+    }
+
+    #[async_trait]
+    impl StorageProvider for MarkerTree {
+        fn id(&self) -> &str {
+            "marker"
+        }
+        fn capabilities(&self) -> Capabilities {
+            Capabilities::default()
+        }
+        async fn list(&self, path: &str) -> bucketforge_provider::Result<Vec<Entry>> {
+            if path == "b" {
+                Ok(vec![Entry::file("b/f.txt", 1), Entry::file("b/sub/", 0)])
+            } else {
+                Ok(Vec::new())
+            }
+        }
+        async fn stat(&self, path: &str) -> bucketforge_provider::Result<Entry> {
+            Ok(Entry::file(path.to_string(), 1))
+        }
+        async fn read(&self, _path: &str) -> bucketforge_provider::Result<Bytes> {
+            Ok(Bytes::new())
+        }
+        async fn write(
+            &self,
+            _path: &str,
+            _data: Bytes,
+            _ct: Option<&str>,
+        ) -> bucketforge_provider::Result<()> {
+            Ok(())
+        }
+        async fn delete(&self, path: &str) -> bucketforge_provider::Result<()> {
+            if self.fail.lock().unwrap().as_deref() == Some(path) {
+                return Err(ProviderError::Backend("boom".into()));
+            }
+            self.deleted.lock().unwrap().push(path.to_string());
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn delete_folder_does_not_early_delete_marker_returned_as_file() {
+        let app = App::new();
+        let marker = Arc::new(MarkerTree {
+            deleted: Mutex::new(Vec::new()),
+            fail: Mutex::new(Some("b/f.txt".to_string())),
+        });
+        app.add_account(marker.clone());
+
+        let outcome = app
+            .delete_folder(
+                "marker",
+                "b",
+                false,
+                Arc::new(AtomicBool::new(false)),
+                &|_, _| {},
+            )
+            .await
+            .unwrap();
+        let summary = match outcome {
+            DeleteFolderOutcome::Deleted { summary } => summary,
+            other => panic!("expected deleted outcome, got {other:?}"),
+        };
+        assert_eq!(summary.failed, 1);
+        assert!(marker.deleted.lock().unwrap().is_empty());
     }
 
     #[test]
