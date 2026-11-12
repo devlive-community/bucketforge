@@ -60,7 +60,9 @@ pub use bucketforge_provider::{
     ObjectVersion, Page, Permission, ProgressFn, WebsiteConfig,
 };
 pub use content_search::{ContentHit, ContentSearchResult};
-pub use delete::{DeleteFailure, DeleteFolderOutcome, DeleteSummary};
+pub use delete::{
+    DeleteFailure, DeleteFolderOutcome, DeleteProgressEvent, DeleteProgressFn, DeleteSummary,
+};
 pub use duplicates::{DupGroup, DupResult};
 pub use error::{AppError, Result};
 pub use imaging::{CropRect, EditSave, ExifInfo, ImageData, Ops};
@@ -1181,7 +1183,7 @@ impl App {
         Ok(self.provider(account)?.delete(path).await?)
     }
 
-    /// 批量删除一组对象路径(多选删除)。
+    /// 批量删除一组对象路径(显式勾选)。
     ///
     /// 不设 20,000 条遍历上限:路径集合已经是用户显式勾选的结果。单个对象失败不会中止
     /// 整批,最终以 [`DeleteSummary`] 返回;`cancel` 置位后不再调度新批次。
@@ -1190,17 +1192,25 @@ impl App {
         account: &str,
         paths: &[String],
         cancel: Arc<AtomicBool>,
-        progress: ProgressFn<'_>,
+        progress: DeleteProgressFn<'_>,
     ) -> Result<DeleteSummary> {
         let provider = self.provider(account)?;
+        let total = paths.len() as u64;
         Ok(delete::run_delete_batches(
             provider,
             paths.to_vec(),
-            Some(paths.len() as u64),
-            0,
             self.delete_concurrency(),
             cancel,
-            progress,
+            |summary| {
+                progress(DeleteProgressEvent::DeletingFiles {
+                    done: summary.processed(),
+                    total: Some(total),
+                    phase_done: summary.processed(),
+                    phase_total: Some(total),
+                    discovered: 0,
+                    failed: summary.failed,
+                });
+            },
         )
         .await)
     }
@@ -1829,7 +1839,7 @@ impl App {
         root: &str,
         allow_unbounded: bool,
         cancel: Arc<AtomicBool>,
-        progress: ProgressFn<'_>,
+        progress: DeleteProgressFn<'_>,
     ) -> Result<DeleteFolderOutcome> {
         let provider = self.provider(account)?;
         delete::delete_folder(
@@ -2655,7 +2665,7 @@ mod tests {
                 "b/photos",
                 false,
                 Arc::new(AtomicBool::new(false)),
-                &|_, _| {},
+                &|_| {},
             )
             .await
             .unwrap();
@@ -2685,7 +2695,7 @@ mod tests {
                 "b/photos",
                 false,
                 Arc::new(AtomicBool::new(false)),
-                &|_, _| {},
+                &|_| {},
             )
             .await
             .unwrap();
@@ -2714,7 +2724,7 @@ mod tests {
                 "b",
                 false,
                 Arc::new(AtomicBool::new(false)),
-                &|_, _| {},
+                &|_| {},
             )
             .await
             .unwrap();
@@ -2727,19 +2737,95 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn delete_folder_limit_exceeded_reports_scanned_count() {
+        let app = App::new();
+        let bulk = Arc::new(BulkTree::new(SEARCH_SCAN_LIMIT + 1));
+        app.add_account(bulk.clone());
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink = events.clone();
+        let progress = move |event| sink.lock().unwrap().push(event);
+
+        let outcome = app
+            .delete_folder(
+                "bulk",
+                "b",
+                false,
+                Arc::new(AtomicBool::new(false)),
+                &progress,
+            )
+            .await
+            .unwrap();
+
+        assert!(matches!(
+            outcome,
+            DeleteFolderOutcome::LimitExceeded { limit, at_least }
+                if limit == SEARCH_SCAN_LIMIT && at_least == SEARCH_SCAN_LIMIT + 1
+        ));
+        assert_eq!(*bulk.deleted.lock().unwrap(), 0);
+
+        let events = events.lock().unwrap();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            DeleteProgressEvent::Preparing { scanned }
+                if *scanned == (SEARCH_SCAN_LIMIT + 1) as u64
+        )));
+        assert!(!events.iter().any(|event| matches!(
+            event,
+            DeleteProgressEvent::DeletingFiles { .. }
+                | DeleteProgressEvent::CleaningDirectories { .. }
+        )));
+    }
+
+    #[tokio::test]
+    async fn delete_folder_reports_preparing_then_deleting_then_cleaning() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink = events.clone();
+        let progress = move |event| sink.lock().unwrap().push(event);
+
+        let outcome = app
+            .delete_folder(
+                "rec",
+                "b/photos",
+                false,
+                Arc::new(AtomicBool::new(false)),
+                &progress,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(outcome, DeleteFolderOutcome::Deleted { .. }));
+
+        let events = events.lock().unwrap();
+        assert!(matches!(
+            events.first(),
+            Some(DeleteProgressEvent::Preparing { scanned: 0 })
+        ));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            DeleteProgressEvent::DeletingFiles { total: Some(3), .. }
+        )));
+        assert!(matches!(
+            events.last(),
+            Some(DeleteProgressEvent::CleaningDirectories {
+                done: 3,
+                phase_done: 1,
+                phase_total: 1,
+                failed: 0,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
     async fn delete_folder_unbounded_deletes_all_objects_and_marker() {
         let app = App::new();
         let bulk = Arc::new(BulkTree::new(5));
         app.add_account(bulk.clone());
 
         let outcome = app
-            .delete_folder(
-                "bulk",
-                "b",
-                true,
-                Arc::new(AtomicBool::new(false)),
-                &|_, _| {},
-            )
+            .delete_folder("bulk", "b", true, Arc::new(AtomicBool::new(false)), &|_| {})
             .await
             .unwrap();
         let summary = match outcome {
@@ -2748,6 +2834,88 @@ mod tests {
         };
         assert_eq!(summary.deleted, 6);
         assert_eq!(*bulk.deleted.lock().unwrap(), 6);
+    }
+
+    #[tokio::test]
+    async fn delete_folder_unbounded_reports_discovered_and_cleaning_phases() {
+        let app = App::new();
+        let bulk = Arc::new(BulkTree::new(5));
+        app.add_account(bulk.clone());
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink = events.clone();
+        let progress = move |event| sink.lock().unwrap().push(event);
+
+        let outcome = app
+            .delete_folder(
+                "bulk",
+                "b",
+                true,
+                Arc::new(AtomicBool::new(false)),
+                &progress,
+            )
+            .await
+            .unwrap();
+        assert!(matches!(outcome, DeleteFolderOutcome::Deleted { .. }));
+
+        let events = events.lock().unwrap();
+        assert!(events.iter().any(|event| matches!(
+            event,
+            DeleteProgressEvent::DeletingFiles {
+                total: None,
+                discovered,
+                ..
+            } if *discovered >= 5
+        )));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            DeleteProgressEvent::CleaningDirectories {
+                total: None,
+                phase_total,
+                ..
+            } if *phase_total >= 1
+        )));
+        assert!(matches!(
+            events.last(),
+            Some(DeleteProgressEvent::CleaningDirectories {
+                done: 6,
+                phase_done: 1,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn delete_folder_cancel_before_scan_deletes_nothing() {
+        let app = App::new();
+        let rec = Arc::new(RecordingTree::new());
+        app.add_account(rec.clone());
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let sink = events.clone();
+        let progress = move |event| sink.lock().unwrap().push(event);
+
+        let outcome = app
+            .delete_folder(
+                "rec",
+                "b/photos",
+                false,
+                Arc::new(AtomicBool::new(true)),
+                &progress,
+            )
+            .await
+            .unwrap();
+        let summary = match outcome {
+            DeleteFolderOutcome::Deleted { summary } => summary,
+            other => panic!("expected deleted outcome, got {other:?}"),
+        };
+        assert!(summary.cancelled);
+        assert_eq!(summary.deleted, 0);
+        assert!(rec.deleted.lock().unwrap().is_empty());
+
+        let events = events.lock().unwrap();
+        assert!(matches!(
+            events.first(),
+            Some(DeleteProgressEvent::Preparing { scanned: 0 })
+        ));
     }
 
     /// 有些厂商把以 `/` 结尾的目录标记当作普通对象返回;它必须归入目录阶段,
@@ -2810,7 +2978,7 @@ mod tests {
                 "b",
                 false,
                 Arc::new(AtomicBool::new(false)),
-                &|_, _| {},
+                &|_| {},
             )
             .await
             .unwrap();

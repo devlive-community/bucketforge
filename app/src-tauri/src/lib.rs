@@ -7,13 +7,14 @@ mod sync_scheduler;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use app_core::{
-    AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, CorsRule, DiffItem,
-    DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, Grant, ImageData, IncompleteUpload,
-    Integrity, LargestFiles, LifecycleRule, ObjectVersion, Ops, Page, PageNumbers, PdfInfo,
-    RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown, SyncJob, SyncReport,
-    SyncSpec, TextPreview, TransferRecord, Watermark, WebsiteConfig,
+    AccountInfo, App, Assembly, Bookmark, ConflictChoice, ContentSearchResult, CorsRule,
+    DeleteProgressEvent, DiffItem, DiffSummary, DupResult, EditSave, ExifInfo, FolderStats, Grant,
+    ImageData, IncompleteUpload, Integrity, LargestFiles, LifecycleRule, ObjectVersion, Ops, Page,
+    PageNumbers, PdfInfo, RenamePlan, RenameRule, SearchResult, Settings, StorageBreakdown,
+    SyncJob, SyncReport, SyncSpec, TextPreview, TransferRecord, Watermark, WebsiteConfig,
 };
 use bucketforge_provider::Entry;
 use bytes::Bytes;
@@ -145,14 +146,86 @@ struct FolderProgress {
     total: u64,
 }
 
-/// 批量删除进度事件负载,发往前端 `delete-progress`。`total = 0` 表示无上限流式删除,
-/// 前端只展示已删除数量。
+/// 删除进度事件负载,发往前端 `delete-progress`。
 #[derive(Clone, Serialize)]
 struct DeleteProgress {
     /// 前端创建的传输任务 id,用于定位进度条。
     id: String,
-    done: u64,
-    total: u64,
+    #[serde(flatten)]
+    event: DeleteProgressEvent,
+}
+
+/// 删除进度合流器。
+///
+/// 删除批次可能完成得很快,逐批 emit 会把 IPC 和 React 更新压满;但阶段切换、最终计数
+/// 又不能丢。这里按 100ms 合并中间事件,阶段变化时先补发上一阶段的挂起值再发新阶段,
+/// 命令返回前调用 [`flush`](Self::flush) 保证最后一帧送达。
+struct DeleteProgressEmitter {
+    app: AppHandle,
+    id: String,
+    state: Mutex<DeleteProgressState>,
+}
+
+#[derive(Default)]
+struct DeleteProgressState {
+    last_emit: Option<Instant>,
+    last_phase: Option<&'static str>,
+    pending: Option<DeleteProgress>,
+}
+
+impl DeleteProgressEmitter {
+    fn new(app: AppHandle, id: String) -> Self {
+        Self {
+            app,
+            id,
+            state: Mutex::new(DeleteProgressState::default()),
+        }
+    }
+
+    fn emit(&self, event: DeleteProgressEvent) {
+        let phase = event.phase();
+        let mut state = self.state.lock().unwrap();
+        let now = Instant::now();
+
+        if state.last_phase != Some(phase) {
+            if let Some(pending) = state.pending.take() {
+                let _ = self.app.emit("delete-progress", pending);
+            }
+            state.last_phase = Some(phase);
+            state.last_emit = Some(now);
+            let _ = self.app.emit(
+                "delete-progress",
+                DeleteProgress {
+                    id: self.id.clone(),
+                    event,
+                },
+            );
+            return;
+        }
+
+        let due = state
+            .last_emit
+            .is_none_or(|last| now.duration_since(last) >= Duration::from_millis(100));
+        let message = DeleteProgress {
+            id: self.id.clone(),
+            event,
+        };
+        if due {
+            state.last_emit = Some(now);
+            state.pending = None;
+            let _ = self.app.emit("delete-progress", message);
+        } else {
+            state.pending = Some(message);
+        }
+    }
+
+    fn flush(&self) {
+        let mut state = self.state.lock().unwrap();
+        if let Some(message) = state.pending.take() {
+            state.last_emit = Some(Instant::now());
+            let _ = self.app.emit("delete-progress", message);
+        }
+    }
 }
 
 /// 列出已注册账号(仅 id)。
@@ -1501,23 +1574,20 @@ async fn delete_folder(
         transfers: transfers.inner(),
         id: transfer_id.clone(),
     };
-    let event_id = transfer_id.clone();
-    let progress = move |done: u64, total: u64| {
-        let _ = app.emit(
-            "delete-progress",
-            DeleteProgress {
-                id: event_id.clone(),
-                done,
-                total,
-            },
-        );
+    let emitter = Arc::new(DeleteProgressEmitter::new(app, transfer_id));
+    let progress = {
+        let emitter = emitter.clone();
+        move |event: DeleteProgressEvent| emitter.emit(event)
     };
-    core.delete_folder(&account, &path, allow_unbounded, cancel, &progress)
-        .await
-        .map_err(|e| e.to_string())
+    let result = core
+        .delete_folder(&account, &path, allow_unbounded, cancel, &progress)
+        .await;
+    emitter.flush();
+    result.map_err(|e| e.to_string())
 }
 
-/// 批量删除多选对象。用户显式勾选,不再套用 20,000 条递归遍历上限。
+/// 批量删除用户显式勾选的一组对象。勾选与二次确认已构成显式授权,不再套用
+/// 20,000 条递归遍历上限。
 #[tauri::command]
 async fn delete_paths(
     app: AppHandle,
@@ -1533,20 +1603,14 @@ async fn delete_paths(
         transfers: transfers.inner(),
         id: transfer_id.clone(),
     };
-    let event_id = transfer_id.clone();
-    let progress = move |done: u64, total: u64| {
-        let _ = app.emit(
-            "delete-progress",
-            DeleteProgress {
-                id: event_id.clone(),
-                done,
-                total,
-            },
-        );
+    let emitter = Arc::new(DeleteProgressEmitter::new(app, transfer_id));
+    let progress = {
+        let emitter = emitter.clone();
+        move |event: DeleteProgressEvent| emitter.emit(event)
     };
-    core.delete_paths(&account, &paths, cancel, &progress)
-        .await
-        .map_err(|e| e.to_string())
+    let result = core.delete_paths(&account, &paths, cancel, &progress).await;
+    emitter.flush();
+    result.map_err(|e| e.to_string())
 }
 
 /// 递归把整个远端文件夹转换存储类型。每处理一个发一次 `folder-progress`。
@@ -2350,4 +2414,39 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn delete_progress_flattens_phase_fields_next_to_id() {
+        let value = serde_json::to_value(DeleteProgress {
+            id: "delete:batch:1".into(),
+            event: DeleteProgressEvent::DeletingFiles {
+                done: 1,
+                total: Some(3),
+                phase_done: 1,
+                phase_total: Some(3),
+                discovered: 0,
+                failed: 0,
+            },
+        })
+        .unwrap();
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "id": "delete:batch:1",
+                "phase": "deleting_files",
+                "done": 1,
+                "total": 3,
+                "phase_done": 1,
+                "phase_total": 3,
+                "discovered": 0,
+                "failed": 0,
+            })
+        );
+    }
 }

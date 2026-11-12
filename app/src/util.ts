@@ -13,6 +13,10 @@ export function isBucket(entry: Entry): boolean {
   );
 }
 
+/** 删除类传输任务。删除没有可恢复进度,持久化记录里也不含失败数。 */
+export const DELETE_KINDS = new Set(["删除文件夹", "批量删除"]);
+export const isDeleteKind = (kind: string) => DELETE_KINDS.has(kind);
+
 /** 人类可读的字节数。 */
 export function formatBytes(size: number): string {
   if (size <= 0) return "—";

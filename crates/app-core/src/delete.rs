@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use bucketforge_provider::{DeleteItemResult, Entry, ProgressFn, StorageProvider};
+use bucketforge_provider::{DeleteItemResult, Entry, StorageProvider};
 use futures::stream::{self, StreamExt};
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +20,6 @@ use crate::{Result, SEARCH_SCAN_LIMIT};
 
 /// 摘要里最多保留多少条错误样例;失败总数仍然完整计数。
 const MAX_RECORDED_ERRORS: usize = 5;
-/// 每处理多少个对象发一次进度,避免 20k 次 Tauri 事件把 UI 淹掉。
-const PROGRESS_STEP: u64 = 50;
 
 /// 一个对象的删除失败。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,7 +68,7 @@ impl DeleteSummary {
         }
     }
 
-    fn processed(&self) -> u64 {
+    pub(crate) fn processed(&self) -> u64 {
         self.deleted + self.failed
     }
 }
@@ -83,22 +81,72 @@ pub enum DeleteFolderOutcome {
     LimitExceeded { limit: usize, at_least: usize },
 }
 
+/// 删除过程的阶段化进度事件。
+///
+/// 删除不是单一计数:有界递归删除先扫描,再删文件,最后清理目录占位;无上限删除则边发现
+/// 边删。阶段用 tag 区分,避免用 `total = 0` 同时表示“未知”和“不适用”。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "phase", rename_all = "snake_case")]
+pub enum DeleteProgressEvent {
+    Preparing {
+        /// 已扫描的条目数(文件、目录项与目录占位对象)。
+        scanned: u64,
+    },
+    DeletingFiles {
+        /// 累计已处理(成功 + 失败),用于总进度条。
+        done: u64,
+        /// 总项数(文件 + 目录占位 + 根占位);`None` 表示无上限流式删除。
+        total: Option<u64>,
+        /// 当前阶段已处理。
+        phase_done: u64,
+        /// 当前阶段总数;`None` 表示无上限流式删除。
+        phase_total: Option<u64>,
+        /// 流式删除中已发现的条目数。
+        discovered: u64,
+        /// 累计失败数。
+        failed: u64,
+    },
+    CleaningDirectories {
+        /// 累计已处理(成功 + 失败),用于总进度条。
+        done: u64,
+        /// 总项数(文件 + 目录占位 + 根占位);`None` 表示无上限流式删除。
+        total: Option<u64>,
+        /// 当前阶段已处理(含根目录占位)。
+        phase_done: u64,
+        /// 当前阶段总数(含根目录占位)。
+        phase_total: u64,
+        /// 累计失败数。
+        failed: u64,
+    },
+}
+
+impl DeleteProgressEvent {
+    /// 阶段标识。节流器用它判断是否必须立即送达(阶段切换不能丢)。
+    pub fn phase(&self) -> &'static str {
+        match self {
+            Self::Preparing { .. } => "preparing",
+            Self::DeletingFiles { .. } => "deleting_files",
+            Self::CleaningDirectories { .. } => "cleaning_directories",
+        }
+    }
+}
+
+pub type DeleteProgressFn<'a> = &'a (dyn Fn(DeleteProgressEvent) + Send + Sync);
+
 /// 把路径切成 `provider.max_delete_batch()` 大小的批次,按 `concurrency` 个批次并发执行。
 ///
-/// `total` 是全局总数(跨多个阶段复用时保持不变);`progress_offset` 是此前阶段已处理的
-/// 数量。`total = None` 表示流式无上限删除,进度分母未知。
+/// 每完成一个批次回调一次 `report`,由调用方把本阶段的累计结果映射成
+/// [`DeleteProgressEvent`]。节流在 Tauri 适配层做,核心层只在自然批次边界报告。
 pub(crate) async fn run_delete_batches(
     provider: Arc<dyn StorageProvider>,
     paths: Vec<String>,
-    total: Option<u64>,
-    progress_offset: u64,
     concurrency: usize,
     cancel: Arc<AtomicBool>,
-    progress: ProgressFn<'_>,
+    mut report: impl FnMut(&DeleteSummary) + Send,
 ) -> DeleteSummary {
     let mut summary = DeleteSummary::default();
+    report(&summary);
     if paths.is_empty() {
-        progress(progress_offset, total.unwrap_or(0));
         return summary;
     }
 
@@ -123,7 +171,6 @@ pub(crate) async fn run_delete_batches(
         })
         .buffer_unordered(concurrency);
 
-    let mut last_report = 0u64;
     while let Some(batch) = batches.next().await {
         let Some(results) = batch else {
             summary.cancelled = true;
@@ -132,22 +179,13 @@ pub(crate) async fn run_delete_batches(
         for result in results {
             summary.record(result);
         }
-
-        let processed = summary.processed();
-        let reached_end = total.is_some_and(|total| processed >= total);
-        if processed - last_report >= PROGRESS_STEP || reached_end {
-            progress(progress_offset + processed, total.unwrap_or(0));
-            last_report = processed;
-        }
+        report(&summary);
         if cancel.load(Ordering::Relaxed) {
             summary.cancelled = true;
             break;
         }
     }
 
-    if last_report < summary.processed() {
-        progress(progress_offset + summary.processed(), total.unwrap_or(0));
-    }
     summary
 }
 
@@ -164,15 +202,19 @@ async fn walk_for_delete(
     root: &str,
     limit: Option<usize>,
     cancel: &AtomicBool,
+    progress: DeleteProgressFn<'_>,
 ) -> Result<WalkOutcome> {
     let cap = limit.map(|limit| limit.saturating_add(1));
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     let mut queue = VecDeque::from([root.to_string()]);
-    let mut count = 0usize;
+    let mut count = 0u64;
+
+    progress(DeleteProgressEvent::Preparing { scanned: 0 });
 
     'walk: while let Some(dir) = queue.pop_front() {
         if cancel.load(Ordering::Relaxed) {
+            progress(DeleteProgressEvent::Preparing { scanned: count });
             return Ok(WalkOutcome {
                 files: Vec::new(),
                 dirs: Vec::new(),
@@ -182,9 +224,16 @@ async fn walk_for_delete(
         }
         let mut cursor = None;
         loop {
-            let page = provider.list_page(&dir, cursor).await?;
+            let page = match provider.list_page(&dir, cursor).await {
+                Ok(page) => page,
+                Err(error) => {
+                    progress(DeleteProgressEvent::Preparing { scanned: count });
+                    return Err(error.into());
+                }
+            };
             for entry in page.entries {
                 if cancel.load(Ordering::Relaxed) {
+                    progress(DeleteProgressEvent::Preparing { scanned: count });
                     return Ok(WalkOutcome {
                         files: Vec::new(),
                         dirs: Vec::new(),
@@ -192,7 +241,7 @@ async fn walk_for_delete(
                         cancelled: true,
                     });
                 }
-                if cap.is_some_and(|cap| count >= cap) {
+                if cap.is_some_and(|cap| count >= cap as u64) {
                     break 'walk;
                 }
                 count += 1;
@@ -208,6 +257,7 @@ async fn walk_for_delete(
                     files.push(entry);
                 }
             }
+            progress(DeleteProgressEvent::Preparing { scanned: count });
             match page.cursor {
                 Some(next) => cursor = Some(next),
                 None => break,
@@ -221,10 +271,12 @@ async fn walk_for_delete(
     dirs.sort();
     dirs.dedup();
 
+    progress(DeleteProgressEvent::Preparing { scanned: count });
+
     Ok(WalkOutcome {
         files,
         dirs,
-        truncated: limit.is_some_and(|limit| count > limit),
+        truncated: limit.is_some_and(|limit| count > limit as u64),
         cancelled: false,
     })
 }
@@ -235,14 +287,14 @@ pub(crate) async fn delete_folder(
     allow_unbounded: bool,
     concurrency: usize,
     cancel: Arc<AtomicBool>,
-    progress: ProgressFn<'_>,
+    progress: DeleteProgressFn<'_>,
 ) -> Result<DeleteFolderOutcome> {
     if allow_unbounded {
         let summary = delete_prefix_streaming(provider, root, concurrency, cancel, progress).await;
         return Ok(DeleteFolderOutcome::Deleted { summary });
     }
 
-    let walk = walk_for_delete(&provider, root, Some(SEARCH_SCAN_LIMIT), &cancel).await?;
+    let walk = walk_for_delete(&provider, root, Some(SEARCH_SCAN_LIMIT), &cancel, progress).await?;
     if walk.cancelled {
         return Ok(DeleteFolderOutcome::Deleted {
             summary: DeleteSummary {
@@ -262,32 +314,51 @@ pub(crate) async fn delete_folder(
     let dir_total = walk.dirs.len() as u64;
     let grand_total = file_total + dir_total + 1;
     let file_paths: Vec<String> = walk.files.into_iter().map(|entry| entry.path).collect();
-    let mut summary = run_delete_batches(
+    let file_summary = run_delete_batches(
         provider.clone(),
         file_paths,
-        Some(grand_total),
-        0,
         concurrency,
         cancel.clone(),
-        progress,
+        |run_summary| {
+            progress(DeleteProgressEvent::DeletingFiles {
+                done: run_summary.processed(),
+                total: Some(grand_total),
+                phase_done: run_summary.processed(),
+                phase_total: Some(file_total),
+                discovered: 0,
+                failed: run_summary.failed,
+            });
+        },
     )
     .await;
 
     // 文件阶段有失败或取消:保留目录占位,避免目录消失但文件残留。
-    if summary.cancelled || summary.failed > 0 {
-        return Ok(DeleteFolderOutcome::Deleted { summary });
+    if file_summary.cancelled || file_summary.failed > 0 {
+        return Ok(DeleteFolderOutcome::Deleted {
+            summary: file_summary,
+        });
     }
 
+    let file_done = file_summary.processed();
+    let file_failed = file_summary.failed;
+    let mut summary = file_summary;
     let mut dirs = walk.dirs;
     dirs.sort_by_key(|path| std::cmp::Reverse(path.len()));
+    let dir_phase_total = dir_total + 1;
     let dir_summary = run_delete_batches(
         provider.clone(),
         dirs,
-        Some(grand_total),
-        summary.processed(),
         concurrency,
         cancel.clone(),
-        progress,
+        |run_summary| {
+            progress(DeleteProgressEvent::CleaningDirectories {
+                done: file_done + run_summary.processed(),
+                total: Some(grand_total),
+                phase_done: run_summary.processed(),
+                phase_total: dir_phase_total,
+                failed: file_failed + run_summary.failed,
+            });
+        },
     )
     .await;
     summary.merge(dir_summary);
@@ -298,15 +369,17 @@ pub(crate) async fn delete_folder(
     }
 
     let root_marker = crate::ensure_trailing_slash(root);
-    let root_summary = run_delete_batches(
-        provider,
-        vec![root_marker],
-        Some(grand_total),
-        summary.processed(),
-        1,
-        cancel,
-        progress,
-    )
+    let root_done_base = summary.processed();
+    let root_failed_base = summary.failed;
+    let root_summary = run_delete_batches(provider, vec![root_marker], 1, cancel, |run_summary| {
+        progress(DeleteProgressEvent::CleaningDirectories {
+            done: root_done_base + run_summary.processed(),
+            total: Some(grand_total),
+            phase_done: dir_total + run_summary.processed(),
+            phase_total: dir_phase_total,
+            failed: root_failed_base + run_summary.failed,
+        });
+    })
     .await;
     summary.merge(root_summary);
     Ok(DeleteFolderOutcome::Deleted { summary })
@@ -318,11 +391,25 @@ async fn delete_prefix_streaming(
     root: &str,
     concurrency: usize,
     cancel: Arc<AtomicBool>,
-    progress: ProgressFn<'_>,
+    progress: DeleteProgressFn<'_>,
 ) -> DeleteSummary {
     let mut summary = DeleteSummary::default();
     let mut dirs = Vec::new();
     let mut queue = VecDeque::from([root.to_string()]);
+    let mut discovered = 0u64;
+
+    let report_streaming = |summary: &DeleteSummary, discovered: u64| {
+        progress(DeleteProgressEvent::DeletingFiles {
+            done: summary.processed(),
+            total: None,
+            phase_done: summary.processed(),
+            phase_total: None,
+            discovered,
+            failed: summary.failed,
+        });
+    };
+
+    report_streaming(&summary, discovered);
 
     'walk: while let Some(dir) = queue.pop_front() {
         if cancel.load(Ordering::Relaxed) {
@@ -347,6 +434,7 @@ async fn delete_prefix_streaming(
                 if entry.path.trim_end_matches('/') == root.trim_end_matches('/') {
                     continue;
                 }
+                discovered += 1;
                 let is_dir = entry.is_dir();
                 if is_dir || entry.path.ends_with('/') {
                     dirs.push(entry.path.clone());
@@ -358,20 +446,33 @@ async fn delete_prefix_streaming(
                 }
             }
             if !page_files.is_empty() {
+                let base_done = summary.processed();
+                let base_failed = summary.failed;
+                let page_discovered = discovered;
                 let page_summary = run_delete_batches(
                     provider.clone(),
                     page_files,
-                    None,
-                    summary.processed(),
                     concurrency,
                     cancel.clone(),
-                    progress,
+                    |run_summary| {
+                        progress(DeleteProgressEvent::DeletingFiles {
+                            done: base_done + run_summary.processed(),
+                            total: None,
+                            phase_done: base_done + run_summary.processed(),
+                            phase_total: None,
+                            discovered: page_discovered,
+                            failed: base_failed + run_summary.failed,
+                        });
+                    },
                 )
                 .await;
                 summary.merge(page_summary);
                 if summary.cancelled {
                     break 'walk;
                 }
+            } else {
+                // 这一页只有目录:仍把发现数推进到 UI。
+                report_streaming(&summary, discovered);
             }
             match page.cursor {
                 Some(next) => cursor = Some(next),
@@ -380,40 +481,61 @@ async fn delete_prefix_streaming(
         }
     }
 
+    report_streaming(&summary, discovered);
+
     if summary.cancelled || summary.failed > 0 {
         return summary;
     }
 
-    if !dirs.is_empty() {
-        dirs.sort();
-        dirs.dedup();
-        dirs.sort_by_key(|path| std::cmp::Reverse(path.len()));
-        let dir_summary = run_delete_batches(
-            provider.clone(),
-            dirs,
-            None,
-            summary.processed(),
-            concurrency,
-            cancel.clone(),
-            progress,
-        )
-        .await;
-        summary.merge(dir_summary);
-        if summary.cancelled || summary.failed > 0 {
-            return summary;
-        }
+    dirs.sort();
+    dirs.dedup();
+    dirs.sort_by_key(|path| std::cmp::Reverse(path.len()));
+    let dir_total = dirs.len() as u64;
+    let dir_phase_total = dir_total + 1;
+
+    progress(DeleteProgressEvent::CleaningDirectories {
+        done: summary.processed(),
+        total: None,
+        phase_done: 0,
+        phase_total: dir_phase_total,
+        failed: summary.failed,
+    });
+
+    let dir_done_base = summary.processed();
+    let dir_failed_base = summary.failed;
+    let dir_summary = run_delete_batches(
+        provider.clone(),
+        dirs,
+        concurrency,
+        cancel.clone(),
+        |run_summary| {
+            progress(DeleteProgressEvent::CleaningDirectories {
+                done: dir_done_base + run_summary.processed(),
+                total: None,
+                phase_done: run_summary.processed(),
+                phase_total: dir_phase_total,
+                failed: dir_failed_base + run_summary.failed,
+            });
+        },
+    )
+    .await;
+    summary.merge(dir_summary);
+    if summary.cancelled || summary.failed > 0 {
+        return summary;
     }
 
+    let root_done_base = summary.processed();
+    let root_failed_base = summary.failed;
     let root_marker = crate::ensure_trailing_slash(root);
-    let root_summary = run_delete_batches(
-        provider,
-        vec![root_marker],
-        None,
-        summary.processed(),
-        1,
-        cancel,
-        progress,
-    )
+    let root_summary = run_delete_batches(provider, vec![root_marker], 1, cancel, |run_summary| {
+        progress(DeleteProgressEvent::CleaningDirectories {
+            done: root_done_base + run_summary.processed(),
+            total: None,
+            phase_done: dir_total + run_summary.processed(),
+            phase_total: dir_phase_total,
+            failed: root_failed_base + run_summary.failed,
+        });
+    })
     .await;
     summary.merge(root_summary);
     summary
@@ -487,11 +609,9 @@ mod tests {
         let summary = run_delete_batches(
             provider.clone(),
             paths,
-            Some(5),
-            0,
             3,
             Arc::new(AtomicBool::new(false)),
-            &|_, _| {},
+            |_| {},
         )
         .await;
 
@@ -507,11 +627,9 @@ mod tests {
         let summary = run_delete_batches(
             provider.clone(),
             vec!["b/a.txt".to_string()],
-            Some(1),
-            0,
             3,
             Arc::new(AtomicBool::new(true)),
-            &|_, _| {},
+            |_| {},
         )
         .await;
 
@@ -534,5 +652,73 @@ mod tests {
                 "at_least": SEARCH_SCAN_LIMIT + 1,
             })
         );
+    }
+
+    #[test]
+    fn progress_events_serialize_with_phase_tag() {
+        assert_eq!(
+            serde_json::to_value(DeleteProgressEvent::Preparing { scanned: 3 }).unwrap(),
+            serde_json::json!({ "phase": "preparing", "scanned": 3 })
+        );
+        assert_eq!(
+            serde_json::to_value(DeleteProgressEvent::DeletingFiles {
+                done: 4,
+                total: Some(10),
+                phase_done: 4,
+                phase_total: Some(10),
+                discovered: 0,
+                failed: 1,
+            })
+            .unwrap(),
+            serde_json::json!({
+                "phase": "deleting_files",
+                "done": 4,
+                "total": 10,
+                "phase_done": 4,
+                "phase_total": 10,
+                "discovered": 0,
+                "failed": 1,
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(DeleteProgressEvent::CleaningDirectories {
+                done: 10,
+                total: None,
+                phase_done: 2,
+                phase_total: 3,
+                failed: 0,
+            })
+            .unwrap(),
+            serde_json::json!({
+                "phase": "cleaning_directories",
+                "done": 10,
+                "total": null,
+                "phase_done": 2,
+                "phase_total": 3,
+                "failed": 0,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn batch_progress_reports_initial_and_final_counts() {
+        let provider = Arc::new(BatchProvider::default());
+        let paths: Vec<String> = (0..5).map(|index| format!("b/{index}.txt")).collect();
+        let reports = Arc::new(Mutex::new(Vec::new()));
+        let sink = reports.clone();
+
+        let summary = run_delete_batches(
+            provider,
+            paths,
+            3,
+            Arc::new(AtomicBool::new(false)),
+            move |current| sink.lock().unwrap().push(current.processed()),
+        )
+        .await;
+
+        assert_eq!(summary.deleted, 5);
+        let reports = reports.lock().unwrap();
+        assert_eq!(reports.first(), Some(&0));
+        assert_eq!(reports.last(), Some(&5));
     }
 }

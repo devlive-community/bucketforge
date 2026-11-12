@@ -31,12 +31,34 @@ export interface FolderProgress {
   total: number;
 }
 
-/** 批量删除进度事件负载(Rust 端 DeleteProgress)。`total = 0` 表示总数未知。 */
-export interface DeleteProgress {
-  id: string;
-  done: number;
-  total: number;
-}
+/** 删除过程阶段。 */
+export type DeletePhase =
+  | "preparing"
+  | "deleting_files"
+  | "cleaning_directories";
+
+/** 删除进度事件负载(与 Rust 端 DeleteProgressEvent + id 对应)。 */
+export type DeleteProgress =
+  | { id: string; phase: "preparing"; scanned: number }
+  | {
+      id: string;
+      phase: "deleting_files";
+      done: number;
+      total: number | null;
+      phase_done: number;
+      phase_total: number | null;
+      discovered: number;
+      failed: number;
+    }
+  | {
+      id: string;
+      phase: "cleaning_directories";
+      done: number;
+      total: number | null;
+      phase_done: number;
+      phase_total: number;
+      failed: number;
+    };
 
 /** 单个对象的删除失败(与 app_core::DeleteFailure 对应)。 */
 export interface DeleteFailure {
@@ -326,6 +348,19 @@ export interface TransferItem {
   srcPath?: string;
   /** 上传因远端内容一致而被秒传跳过。 */
   skipped?: boolean;
+  /** 删除任务的当前阶段;"waiting" 表示已触发上限、等待用户确认。 */
+  deletePhase?: DeletePhase | "waiting";
+  /** 删除任务累计失败数。 */
+  failed?: number;
+  /** 准备 / 流式删除阶段已扫描或已发现的项数。 */
+  discovered?: number;
+  /** 当前删除阶段的局部进度(用于行内阶段文案)。 */
+  phaseDone?: number;
+  phaseTotal?: number;
+  /** 失败样例(最多 5 条),完成后可在面板查看。 */
+  deleteErrors?: DeleteFailure[];
+  /** 已请求取消,等待后端在批次边界收尾。 */
+  cancelling?: boolean;
 }
 
 /** 文本预览结果(与 Rust 端 app_core::TextPreview 对应)。 */
