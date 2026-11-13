@@ -8,8 +8,8 @@ use bytes::Bytes;
 use futures::StreamExt;
 
 use bucketforge_provider::{
-    path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule,
-    ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider,
+    path, ByteStream, Capabilities, CorsRule, DeleteItemResult, Entry, IncompleteUpload,
+    LifecycleRule, ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider,
 };
 use cloudflare_r2::{ListEntry, S3Client, S3Error};
 
@@ -564,6 +564,14 @@ impl StorageProvider for R2Provider {
             .delete_object(bucket, key)
             .await
             .map_err(map_err)
+    }
+
+    fn max_delete_batch(&self) -> usize {
+        1000
+    }
+
+    async fn delete_batch(&self, paths: &[String]) -> Vec<DeleteItemResult> {
+        bucketforge_provider::delete_batch_multi!(self.client, paths)
     }
 
     async fn copy(&self, from: &str, to: &str) -> Result<()> {

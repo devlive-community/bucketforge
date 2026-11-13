@@ -12,8 +12,9 @@ use futures::StreamExt;
 
 use aliyun_oss::{ListEntry, OssClient, OssError};
 use bucketforge_provider::{
-    path, ByteStream, Capabilities, CorsRule, Entry, IncompleteUpload, LifecycleRule,
-    ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider, WebsiteConfig,
+    path, ByteStream, Capabilities, CorsRule, DeleteItemResult, Entry, IncompleteUpload,
+    LifecycleRule, ObjectVersion, ProgressFn, ProviderError, Result, StorageProvider,
+    WebsiteConfig,
 };
 
 /// 超过该大小的上传自动改用分片上传。
@@ -608,6 +609,14 @@ impl StorageProvider for AliyunProvider {
             .delete_object(bucket, key)
             .await
             .map_err(map_err)
+    }
+
+    fn max_delete_batch(&self) -> usize {
+        1000
+    }
+
+    async fn delete_batch(&self, paths: &[String]) -> Vec<DeleteItemResult> {
+        bucketforge_provider::delete_batch_multi!(self.client, paths)
     }
 
     async fn copy(&self, from: &str, to: &str) -> Result<()> {

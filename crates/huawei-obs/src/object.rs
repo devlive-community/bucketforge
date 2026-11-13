@@ -13,6 +13,7 @@ use serde::Deserialize;
 
 use crate::client::{encode_key, ObsClient};
 use crate::error::{ObsError, Result};
+use crate::multipart::xml_escape;
 use crate::sign;
 
 /// 对象元信息(HEAD 返回)。
@@ -22,6 +23,14 @@ pub struct ObjectMeta {
     pub content_type: Option<String>,
     pub etag: Option<String>,
     pub last_modified: Option<String>,
+}
+
+/// `DeleteMultipleObjects` 响应里某个 key 的失败项。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeleteObjectsError {
+    pub key: String,
+    pub code: String,
+    pub message: String,
 }
 
 /// 一次对象请求的请求体及其相关头。get/delete/head 用 [`Payload::default`]。
@@ -136,6 +145,57 @@ impl ObsClient {
         let resp = self.http().execute(request).await?;
         check_status(resp).await?;
         Ok(())
+    }
+
+    /// 批量删除对象(`POST /?delete`),单次最多 1000 个 key。
+    ///
+    /// 返回失败项;成功项不在返回值里。`Quiet=true` 让服务端只回错误。
+    pub async fn delete_objects(
+        &self,
+        bucket: &str,
+        keys: &[String],
+    ) -> Result<Vec<DeleteObjectsError>> {
+        if keys.is_empty() {
+            return Ok(Vec::new());
+        }
+        if keys.len() > 1000 {
+            return Err(ObsError::Core(cloud_core::CoreError::InvalidRequest(
+                "DeleteMultipleObjects accepts at most 1000 keys".into(),
+            )));
+        }
+        let body = delete_objects_body(keys);
+        let content_md5 = cloud_core::crypto::content_md5(body.as_bytes());
+        let date = now_gmt();
+        let canonical_resource = sign::canonicalized_resource(bucket, "", &[("delete", None)]);
+        let sts = sign::string_to_sign(
+            "POST",
+            &content_md5,
+            "application/xml",
+            &date,
+            "",
+            &canonical_resource,
+        );
+        let authorization = sign::authorization(self.access_key(), self.secret_key(), &sts);
+        let url = format!("{}/?delete", self.bucket_base_url(bucket));
+        let request = self
+            .http()
+            .inner()
+            .request(Method::POST, &url)
+            .header(DATE, &date)
+            .header(AUTHORIZATION, authorization)
+            .header(CONTENT_TYPE, "application/xml")
+            .header("Content-MD5", &content_md5)
+            .header(CONTENT_LENGTH, body.len())
+            .body(body)
+            .build()
+            .map_err(cloud_core::CoreError::from)
+            .map_err(ObsError::from)?;
+        let resp = check_status(self.http().execute(request).await?).await?;
+        let text = resp.text().await.map_err(cloud_core::CoreError::from)?;
+        if text.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+        parse_delete_objects_errors(&text)
     }
 
     /// 服务端复制对象(支持同桶 / 跨桶),无需下载再上传。
@@ -518,6 +578,46 @@ fn fallback_code(status: StatusCode) -> String {
         .replace(' ', "")
 }
 
+fn delete_objects_body(keys: &[String]) -> String {
+    let mut body = String::from("<Delete><Quiet>true</Quiet>");
+    for key in keys {
+        body.push_str("<Object><Key>");
+        body.push_str(&xml_escape(key));
+        body.push_str("</Key></Object>");
+    }
+    body.push_str("</Delete>");
+    body
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteResultXml {
+    #[serde(default, rename = "Error")]
+    errors: Vec<DeleteErrorXml>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct DeleteErrorXml {
+    key: String,
+    code: String,
+    message: String,
+}
+
+fn parse_delete_objects_errors(xml: &str) -> Result<Vec<DeleteObjectsError>> {
+    let doc: DeleteResultXml = quick_xml::de::from_str(xml)
+        .map_err(|e| ObsError::Core(cloud_core::CoreError::InvalidResponse(e.to_string())))?;
+    Ok(doc
+        .errors
+        .into_iter()
+        .map(|e| DeleteObjectsError {
+            key: e.key,
+            code: e.code,
+            message: e.message,
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -682,5 +782,25 @@ mod tests {
         assert_eq!(parsed.code, "NoSuchKey");
         assert_eq!(parsed.message, "The specified key does not exist.");
         assert_eq!(parsed.request_id.as_deref(), Some("0000018A"));
+    }
+
+    #[test]
+    fn delete_objects_body_escapes_keys_and_sets_quiet() {
+        let body = delete_objects_body(&["a&b".to_string(), "dir/c<d>".to_string()]);
+        assert!(body.starts_with("<Delete><Quiet>true</Quiet>"));
+        assert!(body.contains("<Key>a&amp;b</Key>"));
+        assert!(body.contains("<Key>dir/c&lt;d&gt;</Key>"));
+    }
+
+    #[test]
+    fn parses_delete_objects_errors() {
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<DeleteResult>
+  <Error><Key>a.txt</Key><Code>AccessDenied</Code><Message>denied</Message></Error>
+</DeleteResult>"#;
+        let errors = parse_delete_objects_errors(xml).unwrap();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].key, "a.txt");
+        assert_eq!(errors[0].code, "AccessDenied");
     }
 }

@@ -7,6 +7,8 @@ import { faCloudArrowUp, faPlus } from "@fortawesome/free-solid-svg-icons";
 import type {
   AccountInfo,
   Bookmark,
+  DeleteFailure,
+  DeleteProgress,
   DownloadProgress,
   Entry,
   RenamePlan,
@@ -24,6 +26,7 @@ import {
   formatBytes,
   guessMimeType,
   isBucket,
+  isDeleteKind,
   joinRemote,
   parentPath,
   previewKind,
@@ -66,6 +69,7 @@ import { applyAccent, ACCENTS, type Accent } from "./accents";
 import { StatsDialog } from "./components/StatsDialog";
 import { CleanupDialog } from "./components/CleanupDialog";
 import { TransferPanel } from "./components/TransferPanel";
+import { DeleteErrorsDialog } from "./components/DeleteErrorsDialog";
 import { SearchResults } from "./components/SearchResults";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { SyncDialog } from "./components/SyncDialog";
@@ -161,6 +165,17 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [editInfo, setEditInfo] = useState<AccountInfo | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Entry | null>(null);
+  const [pendingUnboundedDelete, setPendingUnboundedDelete] = useState<{
+    account: string;
+    path: string;
+    limit: number;
+    atLeast: number;
+    transferId: string;
+  } | null>(null);
+  const [deleteErrorsTarget, setDeleteErrorsTarget] = useState<{
+    name: string;
+    errors: DeleteFailure[];
+  } | null>(null);
   const [renameTarget, setRenameTarget] = useState<Entry | null>(null);
   const [moveCopyTarget, setMoveCopyTarget] = useState<Entry | null>(null);
   const [migrateTarget, setMigrateTarget] = useState<Entry | null>(null);
@@ -414,6 +429,62 @@ export default function App() {
     );
   };
 
+  // 删除进度是阶段化的,不走字节传输的 speed/EMA;这里只维护阶段与计数。
+  const applyDeleteProgress = (p: DeleteProgress) => {
+    setTransfers((prev) => {
+      const item = prev[p.id];
+      if (!item || item.status !== "active") return prev;
+      if (item.deletePhase === "waiting") return prev;
+      const rank = (phase: string) =>
+        phase === "preparing" ? 0 : phase === "deleting_files" ? 1 : 2;
+      // 丢弃跨阶段迟到的旧事件,避免进度倒退。
+      if (item.deletePhase && rank(p.phase) < rank(item.deletePhase)) return prev;
+
+      if (p.phase === "preparing") {
+        return {
+          ...prev,
+          [p.id]: {
+            ...item,
+            deletePhase: "preparing",
+            done: 0,
+            total: 0,
+            discovered: p.scanned,
+            phaseDone: 0,
+            phaseTotal: 0,
+            failed: 0,
+          },
+        };
+      }
+      if (p.phase === "deleting_files") {
+        return {
+          ...prev,
+          [p.id]: {
+            ...item,
+            deletePhase: "deleting_files",
+            done: p.done,
+            total: p.total ?? 0,
+            phaseDone: p.phase_done,
+            phaseTotal: p.phase_total ?? 0,
+            discovered: p.discovered,
+            failed: p.failed,
+          },
+        };
+      }
+      return {
+        ...prev,
+        [p.id]: {
+          ...item,
+          deletePhase: "cleaning_directories",
+          done: p.done,
+          total: p.total ?? 0,
+          phaseDone: p.phase_done,
+          phaseTotal: p.phase_total,
+          failed: p.failed,
+        },
+      };
+    });
+  };
+
   // 传输列表持久化:只在**状态**变化时写库(进度 tick 不写),完成即删。
   const persistedRef = useRef<Record<string, TransferItem["status"]>>({});
   useEffect(() => {
@@ -440,6 +511,12 @@ export default function App() {
       const restored: Record<string, TransferItem> = {};
       const persisted: Record<string, TransferItem["status"]> = {};
       for (const r of rows) {
+        // 删除任务没有可恢复进度,持久化记录也不含失败数;重启后直接清掉,
+        // 避免把 done 误当成成功数展示。
+        if (isDeleteKind(r.kind)) {
+          void api.deleteTransfer(r.id);
+          continue;
+        }
         persisted[r.id] = r.status;
         restored[r.id] = {
           ...r,
@@ -463,7 +540,7 @@ export default function App() {
   const startTransfer = async (t: TransferSpec) => {
     setTransfers((prev) => ({
       ...prev,
-      [t.id]: { ...t, done: 0, total: 0, status: "active" },
+      [t.id]: { ...t, done: 0, total: 0, status: "active", cancelling: false },
     }));
     try {
       let skipped = false;
@@ -521,10 +598,10 @@ export default function App() {
   };
 
   const cancelTransfer = (id: string) => {
-    // 乐观标记为已取消(即时反馈),再通知后端在下个分片 / 数据块中止。
+    // 先显示「正在取消」,最终状态由各任务在后端于批次 / 分片边界收尾后落定。
     setTransfers((prev) =>
       prev[id] && prev[id].status === "active"
-        ? { ...prev, [id]: { ...prev[id], status: "cancelled" } }
+        ? { ...prev, [id]: { ...prev[id], cancelling: true } }
         : prev,
     );
     void api.cancelTransfer(id);
@@ -699,6 +776,9 @@ export default function App() {
       const { op, path, done, total } = e.payload;
       updateProgress(`folder:${op}:${path}`, done, total);
     });
+    const unDelete = listen<DeleteProgress>("delete-progress", (e) => {
+      applyDeleteProgress(e.payload);
+    });
     // 定时同步现在完全由 Rust 后端调度(见 sync_scheduler.rs);这里只接收它跑完后的
     // 通知,空跑(没有任何上传/下载/删除且没失败)不会收到这个事件。
     const unSyncJob = listen<SyncJobFinished>("sync-job-finished", (e) => {
@@ -716,6 +796,7 @@ export default function App() {
       unDownload.then((off) => off());
       unTransfer.then((off) => off());
       unFolder.then((off) => off());
+      unDelete.then((off) => off());
       unSyncJob.then((off) => off());
     };
   }, []);
@@ -1113,21 +1194,80 @@ export default function App() {
   const doBatchDelete = async () => {
     setPendingBatchDelete(false);
     if (!current || selected.size === 0) return;
-    setBusy(true);
     setError(null);
-    const deleted = new Set(selected);
+    const paths = [...selected];
+    const id = `delete:batch:${Date.now()}`;
+    setTransfers((prev) => ({
+      ...prev,
+      [id]: {
+        id,
+        kind: "批量删除",
+        name: t("{n} 个对象", { n: paths.length }),
+        account: current,
+        remote: "",
+        local: "",
+        done: 0,
+        total: paths.length,
+        status: "active",
+        deletePhase: "deleting_files",
+        phaseDone: 0,
+        phaseTotal: paths.length,
+        discovered: 0,
+        failed: 0,
+        cancelling: false,
+      },
+    }));
     try {
-      for (const p of deleted) await api.deletePath(current, p);
-      clearSelection();
-      // 搜索视图里把已删的命中去掉,避免残留。
-      setSearch((s) =>
-        s ? { ...s, results: s.results.filter((r) => !deleted.has(r.path)) } : s,
+      const summary = await api.deletePaths(current, paths, id);
+      const status = summary.cancelled ? "cancelled" : summary.failed ? "error" : "done";
+      setTransfers((prev) =>
+        prev[id]
+          ? {
+              ...prev,
+              [id]: {
+                ...prev[id],
+                status,
+                done: summary.deleted + summary.failed,
+                failed: summary.failed,
+                deleteErrors: summary.errors,
+                cancelling: false,
+              },
+            }
+          : prev,
       );
+      if (summary.failed > 0) {
+        setNotice({
+          tone: "warn",
+          text: t("批量删除:成功 {ok},失败 {fail}", {
+            ok: summary.deleted,
+            fail: summary.failed,
+          }),
+        });
+      } else if (!summary.cancelled) {
+        setNotice({
+          tone: "ok",
+          text: t("✓ 已删除 {n} 项", { n: summary.deleted }),
+        });
+      }
+      // 只有全部成功才清空选择;部分失败时保留勾选,便于用户重试。
+      if (!summary.cancelled && summary.failed === 0) {
+        const deleted = new Set(paths);
+        clearSelection();
+        setSearch((s) =>
+          s ? { ...s, results: s.results.filter((r) => !deleted.has(r.path)) } : s,
+        );
+      }
       await load();
     } catch (e) {
       setError(String(e));
-    } finally {
-      setBusy(false);
+      setTransfers((prev) =>
+        prev[id]
+          ? {
+              ...prev,
+              [id]: { ...prev[id], status: "error", cancelling: false },
+            }
+          : prev,
+      );
     }
   };
 
@@ -1393,23 +1533,176 @@ export default function App() {
     await runFolderDownload(current, entry.path, dir, entry.name);
   };
 
+  const runDeleteFolder = async (
+    account: string,
+    path: string,
+    allowUnbounded: boolean,
+    transferId: string,
+    resume = false,
+  ) => {
+    setError(null);
+    setTransfers((prev) => {
+      const prior = prev[transferId];
+      const item: TransferItem =
+        prior && resume
+          ? {
+              ...prior,
+              status: "active",
+              done: 0,
+              total: 0,
+              deletePhase: "deleting_files",
+              phaseDone: 0,
+              phaseTotal: 0,
+              discovered: 0,
+              failed: 0,
+              deleteErrors: undefined,
+              cancelling: false,
+            }
+          : {
+              id: transferId,
+              kind: "删除文件夹",
+              name: baseName(path),
+              account,
+              remote: path,
+              local: "",
+              done: 0,
+              total: 0,
+              status: "active",
+              deletePhase: allowUnbounded ? "deleting_files" : "preparing",
+              phaseDone: 0,
+              phaseTotal: 0,
+              discovered: 0,
+              failed: 0,
+              cancelling: false,
+            };
+      return { ...prev, [transferId]: item };
+    });
+    try {
+      const outcome = await api.deleteFolder(
+        account,
+        path,
+        transferId,
+        allowUnbounded,
+      );
+      if (outcome.status === "limit_exceeded") {
+        // 准备阶段没有删除任何对象;保留行并停在「等待确认」,确认后复用同一行。
+        setTransfers((prev) =>
+          prev[transferId]
+            ? {
+                ...prev,
+                [transferId]: {
+                  ...prev[transferId],
+                  status: "active",
+                  deletePhase: "waiting",
+                  discovered: outcome.at_least,
+                  cancelling: false,
+                },
+              }
+            : prev,
+        );
+        setPendingUnboundedDelete({
+          account,
+          path,
+          limit: outcome.limit,
+          atLeast: outcome.at_least,
+          transferId,
+        });
+        return;
+      }
+      const summary = outcome.summary;
+      const status = summary.cancelled ? "cancelled" : summary.failed ? "error" : "done";
+      setTransfers((prev) =>
+        prev[transferId]
+          ? {
+              ...prev,
+              [transferId]: {
+                ...prev[transferId],
+                status,
+                done: summary.deleted + summary.failed,
+                failed: summary.failed,
+                deleteErrors: summary.errors,
+                cancelling: false,
+              },
+            }
+          : prev,
+      );
+      if (summary.failed > 0) {
+        setNotice({
+          tone: "warn",
+          text: t("删除文件夹:成功 {ok},失败 {fail}", {
+            ok: summary.deleted,
+            fail: summary.failed,
+          }),
+        });
+      } else if (!summary.cancelled) {
+        setNotice({
+          tone: "ok",
+          text: t("✓ 已删除 {name}", { name: baseName(path) }),
+        });
+      }
+      if (account === current) await load();
+    } catch (e) {
+      setError(String(e));
+      setTransfers((prev) =>
+        prev[transferId]
+          ? {
+              ...prev,
+              [transferId]: {
+                ...prev[transferId],
+                status: "error",
+                cancelling: false,
+              },
+            }
+          : prev,
+      );
+    }
+  };
+
   const doDelete = async () => {
     const entry = pendingDelete;
     setPendingDelete(null);
     if (!current || !entry) return;
-    setBusy(true);
     setError(null);
     try {
-      if (isBucket(entry)) await api.deleteBucket(current, entry.path);
-      else if (entry.kind === "directory")
-        await api.deleteFolder(current, entry.path);
-      else await api.deletePath(current, entry.path);
-      await load();
+      if (isBucket(entry)) {
+        setBusy(true);
+        await api.deleteBucket(current, entry.path);
+        await load();
+      } else if (entry.kind === "directory") {
+        await runDeleteFolder(
+          current,
+          entry.path,
+          false,
+          `delete:folder:${Date.now()}`,
+        );
+      } else {
+        setBusy(true);
+        await api.deletePath(current, entry.path);
+        await load();
+      }
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  const declineUnboundedDelete = () => {
+    const target = pendingUnboundedDelete;
+    setPendingUnboundedDelete(null);
+    if (!target) return;
+    setTransfers((prev) =>
+      prev[target.transferId]
+        ? {
+            ...prev,
+            [target.transferId]: {
+              ...prev[target.transferId],
+              status: "cancelled",
+              cancelling: false,
+            },
+          }
+        : prev,
+    );
   };
 
   const doRename = async (newName: string) => {
@@ -1974,6 +2267,8 @@ export default function App() {
     !!versionsTarget ||
     !!statsTarget ||
     !!cleanupTarget ||
+    !!deleteErrorsTarget ||
+    !!pendingUnboundedDelete ||
     pendingBatchDelete ||
     showPalette ||
     showSettings;
@@ -2019,7 +2314,9 @@ export default function App() {
         setStatsTarget(null);
         setStatsData(null);
       } else if (cleanupTarget) setCleanupTarget(null);
+      else if (deleteErrorsTarget) setDeleteErrorsTarget(null);
       else if (showForm) setShowForm(false);
+      else if (pendingUnboundedDelete) declineUnboundedDelete();
       else if (pendingBatchDelete) setPendingBatchDelete(false);
       else if (pendingDelete) setPendingDelete(null);
       else if (detailsEntry) setDetailsEntry(null);
@@ -2352,6 +2649,12 @@ export default function App() {
                 onClear={clearTransfers}
                 onRetry={retryTransfer}
                 onCancel={cancelTransfer}
+                onShowErrors={(item) =>
+                  setDeleteErrorsTarget({
+                    name: item.name,
+                    errors: item.deleteErrors ?? [],
+                  })
+                }
               />
             )}
           </>
@@ -2399,7 +2702,7 @@ export default function App() {
                 })
               : pendingDelete.kind === "directory"
                 ? t(
-                    "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。",
+                    "确定删除整个文件夹 {name}?其下所有对象都会被递归删除,此操作不可恢复。若桶启用了版本控制,历史版本仍会保留。",
                     { name: pendingDelete.name },
                   )
                 : t("确定删除 {name}?此操作不可恢复。", {
@@ -2410,6 +2713,33 @@ export default function App() {
           confirmLabel={t("删除")}
           onConfirm={doDelete}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingUnboundedDelete && (
+        <ConfirmDialog
+          title={t("超过默认扫描上限")}
+          message={t(
+            "该文件夹已扫描 {n} 项,超过默认扫描上限 {limit} 项。继续将不设上限地流式删除,可能耗时较久,且不可恢复。",
+            {
+              n: pendingUnboundedDelete.atLeast,
+              limit: pendingUnboundedDelete.limit,
+            },
+          )}
+          danger
+          confirmLabel={t("继续删除")}
+          onConfirm={() => {
+            const target = pendingUnboundedDelete;
+            setPendingUnboundedDelete(null);
+            void runDeleteFolder(
+              target.account,
+              target.path,
+              true,
+              target.transferId,
+              true,
+            );
+          }}
+          onCancel={declineUnboundedDelete}
         />
       )}
 
@@ -2780,6 +3110,14 @@ export default function App() {
             setLargeRoot(null);
             setPath(parentPath(p));
           }}
+        />
+      )}
+
+      {deleteErrorsTarget && (
+        <DeleteErrorsDialog
+          name={deleteErrorsTarget.name}
+          errors={deleteErrorsTarget.errors}
+          onClose={() => setDeleteErrorsTarget(null)}
         />
       )}
 

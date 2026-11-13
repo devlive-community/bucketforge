@@ -60,6 +60,7 @@ const SUBRESOURCE_KEYS: &[&str] = &[
     "versionId",
     "cors",
     "website",
+    "delete",
 ];
 
 /// 构造带子资源的 CanonicalizedResource,如 `/bucket/key?partNumber=1&uploadId=xxx`。
@@ -177,6 +178,14 @@ mod tests {
             &[("uploadId", Some("abc")), ("partNumber", Some("1"))],
         );
         assert_eq!(got, "/b/k?partNumber=1&uploadId=abc");
+    }
+
+    #[test]
+    fn canonicalized_resource_includes_delete_subresource() {
+        assert_eq!(
+            canonicalized_resource("b", "", &[("delete", None)]),
+            "/b/?delete"
+        );
     }
 
     #[test]
